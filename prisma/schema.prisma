@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  VICTIM
+  AUTHORITY
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String   
+  role        Role     @default(VICTIM)
+  fullName    String
+  icNumber    String?
+  phoneNumber String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cases       Case[]
+}
+
+model Case {
+  id               String            @id @default(cuid())
+  rawDescription   String
+  detectedLanguage String?
+  scamType         String?
+  amountLost       Float?
+  urgency          String?           
+  priority         String            @default("NORMAL")
+  summary          String?
+  missingInfo      Json?             
+  suggestedStep    String?
+  suggestedRouting String?           
+  assignedAgency   String?
+  authorityNotes   String?           @default("")
+  documents        Json?             // Drafts as Array<{ title: string, content: string }>
+  workflowStatus   String            @default("NEW") // NEW, ANALYZED, NEEDS_INFO, ROUTED, FOLLOW_UP_PENDING, CLOSED
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  
+  userId           String
+  user             User              @relation(fields: [userId], references: [id])
+
+  messages         Message[]
+  evidence         Evidence[]
+  ticket           AuthorityTicket?
+  followUpTasks    FollowUpTask[]
+}
+
+model FollowUpTask {
+  id          String    @id @default(cuid())
+  caseId      String
+  case        Case      @relation(fields: [caseId], references: [id])
+  title       String
+  description String
+  dueAt       DateTime?
+  status      String    @default("PENDING") // PENDING, COMPLETED
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model AuthorityTicket {
+  id             String   @id @default(cuid())
+  caseId         String   @unique
+  case           Case     @relation(fields: [caseId], references: [id])
+  priority       String   @default("NORMAL")
+  assignedAgency String?
+  status         String   @default("OPEN")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  role      String   // user, assistant, system
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Evidence {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  fileUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
