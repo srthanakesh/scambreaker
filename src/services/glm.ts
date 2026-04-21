@@ -1,15 +1,19 @@
+export type Urgency = 'LOW' | 'MEDIUM' | 'HIGH';
+export type Priority = 'NORMAL' | 'HIGH';
+export type WorkflowStatus = 'NEW' | 'ANALYZED' | 'NEEDS_INFO' | 'ROUTED' | 'CLOSED';
+
 export interface GLMAnalysis {
   detectedLanguage: string;
   scamType: string;
   amountLost: number;
-  urgency: string;
-  priority: string;
+  urgency: Urgency;
+  priority: Priority;
   summary: string;
   missingInfo: string[];
   suggestedStep: string;
   suggestedRouting: string;
   assignedAgency: string;
-  workflowStatus: string;
+  workflowStatus: WorkflowStatus;
   documents: Array<{ title: string; content: string }>;
   tasks: Array<{ title: string; description: string; dueDays: number }>;
   confidence: number;
@@ -23,17 +27,26 @@ export async function analyzeCase(description: string): Promise<GLMAnalysis> {
     return analysis;
   } catch (error: any) {
     console.error("GLM Analysis Failed:", error.message);
-    // Log the full error if it's an API error
     if (error.response) {
-      console.error("API Error Details:", await error.response.text());
+      try {
+        const errorText = await error.response.text();
+        console.error("API Error Details:", errorText);
+      } catch (e) {
+        // ignore if we can't read response text
+      }
     }
+    console.log("GLM failure fallback used.");
     return mockAnalyzeCase(description);
   }
 }
 
 async function glmAnalyzeCase(description: string): Promise<GLMAnalysis> {
   const apiKey = process.env.GLM_API_KEY;
-  const model = process.env.GLM_MODEL || "glm-5-turbo";
+  if (!apiKey) {
+    throw new Error("GLM_API_KEY is not configured in environment variables.");
+  }
+
+  const model = process.env.GLM_MODEL || "glm-4-flash"; // updated to a typical fast model or use what was there before
   
   const response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
     method: "POST",
@@ -72,30 +85,80 @@ async function glmAnalyzeCase(description: string): Promise<GLMAnalysis> {
         }
       ],
       temperature: 0.1,
-      // Some versions of GLM might not support response_format: { type: "json_object" } 
-      // so we rely on the prompt but keep it as a hint if supported.
     }),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`GLM API ${response.status}: ${errorText}`);
+    // We attach the response to the error object so the catch block can log it
+    const error: any = new Error(`GLM API returned status ${response.status}`);
+    error.response = response;
+    throw error;
   }
 
   const result = await response.json();
-  const content = result.choices[0].message.content;
+  const content = result.choices?.[0]?.message?.content || "";
   
   // Clean content in case of markdown blocks
   const jsonString = content.replace(/```json\n?|\n?```/g, '').trim();
+  
+  if (!jsonString) {
+    throw new Error("Empty response from GLM API");
+  }
+
   const analysis = JSON.parse(jsonString);
 
   return normalizeAnalysis(analysis, description);
 }
 
 function normalizeAnalysis(raw: any, description: string): GLMAnalysis {
-  const amountLost = Number(raw.amountLost) || 0;
-  const missingInfo = Array.isArray(raw.missingInfo) ? raw.missingInfo : [];
-  const workflowStatus = missingInfo.length > 0 ? "NEEDS_INFO" : "ROUTED";
+  let fallbackUsed = false;
+
+  const safeNumber = (val: any, defaultVal: number) => {
+    const num = Number(val);
+    if (isNaN(num)) {
+      fallbackUsed = true;
+      return defaultVal;
+    }
+    return num;
+  };
+
+  const safeString = (val: any, defaultVal: string) => {
+    if (typeof val !== 'string' || val.trim() === '') {
+      fallbackUsed = true;
+      return defaultVal;
+    }
+    return val.trim();
+  };
+
+  const safeArray = (val: any) => {
+    if (!Array.isArray(val)) {
+      fallbackUsed = true;
+      return [];
+    }
+    return val;
+  };
+
+  const amountLost = safeNumber(raw.amountLost, 0);
+  const missingInfo = safeArray(raw.missingInfo);
+  
+  // Enums coercions
+  const validUrgencies = ['LOW', 'MEDIUM', 'HIGH'];
+  let urgency: Urgency = 'MEDIUM';
+  if (validUrgencies.includes(raw.urgency)) {
+    urgency = raw.urgency as Urgency;
+  } else if (raw.urgency) {
+    fallbackUsed = true;
+  }
+
+  const validPriorities = ['NORMAL', 'HIGH'];
+  let priority: Priority = 'NORMAL';
+  if (validPriorities.includes(raw.priority)) {
+    priority = raw.priority as Priority;
+  } else if (raw.priority) {
+    fallbackUsed = true;
+  }
+
+  let workflowStatus: WorkflowStatus = missingInfo.length > 0 ? "NEEDS_INFO" : "ROUTED";
 
   // Standard Malaysian Task Templates
   const tasks = [
@@ -112,32 +175,36 @@ function normalizeAnalysis(raw: any, description: string): GLMAnalysis {
   const documents = [
     {
       title: "Draft Police Report",
-      content: `PDRM REPORT DRAFT\n\nIncident: ${raw.scamType}\nSummary: ${raw.summary}\nAmount: RM ${amountLost}\nDetails: ${description.substring(0, 100)}...`
+      content: `PDRM REPORT DRAFT\n\nIncident: ${safeString(raw.scamType, "UNKNOWN")}\nSummary: ${safeString(raw.summary, "Analysis incomplete. Manual review required.")}\nAmount: RM ${amountLost}\nDetails: ${description.substring(0, 100)}...`
     }
   ];
 
+  if (fallbackUsed) {
+    console.log("Normalization fallback used for some missing or invalid fields.");
+  }
+
   return {
-    detectedLanguage: raw.detectedLanguage || "English",
-    scamType: raw.scamType || "General Scam",
+    detectedLanguage: safeString(raw.detectedLanguage, "English"),
+    scamType: safeString(raw.scamType, "UNKNOWN"),
     amountLost,
-    urgency: raw.urgency || "MEDIUM",
-    priority: raw.priority || "NORMAL",
-    summary: raw.summary || "No summary provided.",
+    urgency,
+    priority,
+    summary: safeString(raw.summary, "Analysis incomplete. Manual review required."),
     missingInfo,
-    suggestedStep: raw.suggestedStep || "Contact authorities.",
-    suggestedRouting: raw.suggestedRouting || "Cyber Crime Division",
-    assignedAgency: raw.assignedAgency || "PDRM CCID",
+    suggestedStep: safeString(raw.suggestedStep, "Contact authorities."),
+    suggestedRouting: safeString(raw.suggestedRouting, "General Triage"),
+    assignedAgency: safeString(raw.assignedAgency, "PDRM CCID"),
     workflowStatus,
     documents,
     tasks,
-    confidence: raw.confidence || 0.5
+    confidence: safeNumber(raw.confidence, 0.5)
   };
 }
 
 export function mockAnalyzeCase(description: string): GLMAnalysis {
   return {
     detectedLanguage: "English (Fallback)",
-    scamType: "Unknown Scam",
+    scamType: "UNKNOWN",
     amountLost: 0,
     urgency: "MEDIUM",
     priority: "NORMAL",

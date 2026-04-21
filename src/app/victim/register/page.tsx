@@ -32,16 +32,16 @@ export default function VictimRegister() {
             </div>
 
             <div>
-              <label htmlFor="icNumber" className="block text-sm font-medium text-slate-700">IC Number (Optional)</label>
+              <label htmlFor="icNumber" className="block text-sm font-medium text-slate-700">IC Number</label>
               <div className="mt-1">
-                <input id="icNumber" name="icNumber" type="text" className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900" />
+                <input id="icNumber" name="icNumber" type="text" required className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900" />
               </div>
             </div>
 
             <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-slate-700">Phone Number (Optional)</label>
+              <label htmlFor="phoneNumber" className="block text-sm font-medium text-slate-700">Phone Number</label>
               <div className="mt-1">
-                <input id="phoneNumber" name="phoneNumber" type="tel" className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900" />
+                <input id="phoneNumber" name="phoneNumber" type="tel" required className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900" />
               </div>
             </div>
 

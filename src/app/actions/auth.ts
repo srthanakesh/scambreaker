@@ -42,8 +42,8 @@ export async function register(formData: FormData) {
   const icNumber = formData.get('icNumber') as string;
   const phoneNumber = formData.get('phoneNumber') as string;
 
-  if (!email || !password || !fullName) {
-    return { error: 'Email, password, and full name are required' };
+  if (!email || !password || !fullName || !icNumber || !phoneNumber) {
+    return { error: 'All fields are required' };
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
