@@ -6,14 +6,17 @@ import bcrypt from 'bcryptjs';
 import { redirect } from 'next/navigation';
 
 export async function login(formData: FormData, roleFilter?: 'VICTIM' | 'AUTHORITY') {
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
+  const email = (formData.get('email') as string)?.trim().toLowerCase();
+  const password = (formData.get('password') as string)?.trim();
 
   if (!email || !password) {
     return { error: 'Email and password are required' };
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return { error: 'Invalid credentials' };
   }
@@ -36,17 +39,38 @@ export async function login(formData: FormData, roleFilter?: 'VICTIM' | 'AUTHORI
 }
 
 export async function register(formData: FormData) {
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
-  const fullName = formData.get('fullName') as string;
-  const icNumber = formData.get('icNumber') as string;
-  const phoneNumber = formData.get('phoneNumber') as string;
+  const email = (formData.get('email') as string)?.trim().toLowerCase();
+  const password = (formData.get('password') as string)?.trim();
+  const fullName = (formData.get('fullName') as string)?.trim();
+  const icNumber = (formData.get('icNumber') as string)?.trim();
+  const phoneNumber = (formData.get('phoneNumber') as string)?.trim();
 
-  if (!email || !password || !fullName) {
-    return { error: 'Email, password, and full name are required' };
+  if (!fullName || !icNumber || !phoneNumber || !email || !password) {
+    return {
+      error: 'Full name, IC number, phone number, email, and password are required',
+    };
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  if (!email.includes('@')) {
+    return { error: 'Please enter a valid email address' };
+  }
+
+  if (password.length < 6) {
+    return { error: 'Password must be at least 6 characters long' };
+  }
+
+  if (icNumber.length < 6) {
+    return { error: 'Please enter a valid IC number' };
+  }
+
+  if (phoneNumber.length < 9) {
+    return { error: 'Please enter a valid phone number' };
+  }
+
+  const existing = await prisma.user.findUnique({
+    where: { email },
+  });
+
   if (existing) {
     return { error: 'Email already registered' };
   }
@@ -61,7 +85,7 @@ export async function register(formData: FormData) {
       icNumber,
       phoneNumber,
       role: 'VICTIM',
-    }
+    },
   });
 
   await createSession({
