@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Shield, 
   HelpCircle, 
@@ -43,6 +44,7 @@ const incidentTypes = [
 ];
 
 export default function InteractiveReportFlow({ user }: { user: any }) {
+  const router = useRouter();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Array<{role: string, content: React.ReactNode}>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -51,101 +53,67 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
   const t = {
     en: {
       hello: `Hello, ${user.fullName.split(' ')[0]}. I am the ScamBreaker incident intake assistant.`,
-      instruction: `Please tell me what happened. Include any details like names, numbers, or websites. This helps me send your report to the right team.`
+      instruction: `Please tell me what happened. Include any details like names, numbers, or websites. This helps me send your report to the right team.`,
+      error: `An error occurred while submitting your report. Please try again.`,
     },
     ms: {
       hello: `Helo, ${user.fullName.split(' ')[0]}. Saya ialah pembantu penerimaan insiden ScamBreaker.`,
-      instruction: `Sila beritahu saya apa yang berlaku. Sertakan butiran seperti nama, nombor, atau laman web. Ini membantu saya menghantar laporan anda ke pasukan yang betul.`
+      instruction: `Sila beritahu saya apa yang berlaku. Sertakan butiran seperti nama, nombor, atau laman web. Ini membantu saya menghantar laporan anda ke pasukan yang betul.`,
+      error: `Ralat berlaku semasa menghantar laporan anda. Sila cuba lagi.`,
     },
     zh: {
       hello: `你好，${user.fullName.split(' ')[0]}。我是 ScamBreaker 事件记录助手。`,
-      instruction: `请告诉我发生了什么事情。请包含姓名、电话号码或网站等详细信息。这将帮助我将您的报告发送给正确的团队。`
+      instruction: `请告诉我发生了什么事情。请包含姓名、电话号码或网站等详细信息。这将帮助我将您的报告发送给正确的团队。`,
+      error: `提交报告时出错。请重试。`,
     },
     ta: {
       hello: `வணக்கம், ${user.fullName.split(' ')[0]}. நான் ScamBreaker சம்பவ பதிவு உதவியாளர்.`,
-      instruction: `என்ன நடந்தது என்று சொல்லுங்கள். பெயர்கள், எண்கள் அல்லது இணையதளங்கள் போன்ற விவரங்களைச் சேர்க்கவும். உங்கள் அறிக்கையை சரியான குழுவிற்கு அனுப்ப இது உதவும்.`
+      instruction: `என்ன நடந்தது என்று சொல்லுங்கள். பெயர்கள், எண்கள் அல்லது இணையதளங்கள் போன்ற விவரங்களைச் சேர்க்கவும். உங்கள் அறிக்கையை சரியான குழுவிற்கு அனுப்ப இது உதவும்.`,
+      error: `உங்கள் அறிக்கையை சமர்ப்பிக்கும் போது பிழை ஏற்பட்டது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.`,
     }
   }[language];
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() || isProcessing) return;
 
     const userMsg = input.trim();
-    const lowerInput = userMsg.toLowerCase();
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
     setIsProcessing(true);
 
-    // Z.AI Fallback Method Simulation with Keyword Detection
-    setTimeout(() => {
-      let mockReasoning: React.ReactNode;
-      let mockResponse: string;
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rawDescription: userMsg }),
+      });
 
-      if (lowerInput.includes('bank') || lowerInput.includes('duit') || lowerInput.includes('transfer') || lowerInput.includes('cimb') || lowerInput.includes('maybank')) {
-        mockReasoning = (
-          <div className="text-xs font-mono text-slate-700 bg-slate-100 p-4 rounded-xl border border-slate-200 leading-relaxed shadow-inner overflow-x-auto">
-            <strong>GLM processing:</strong><br />
-            Detects language: Bahasa Malaysia with emotional urgency markers<br />
-            Classifies scam type: E-Commerce Impersonation (Shopee Lucky Draw)<br />
-            Extracts: Amount = RM12,000, Transfer method = bank transfer, Contact channel = phone call<br />
-            Calculates: Transfer time = "tadi" (recent) → freeze window likely OPEN<br />
-            Identifies: Missing information → target bank account number<br />
-            Next action: Ask one targeted question — not a form<br />
-            <br />
-            <strong>Stage 2: Multi-Step Reasoning & Case Classification</strong><br />
-            Once GLM has the 6W1H complete, it runs a reasoning chain:<br />
-            INPUT: RM12,000 | Transfer: 47 mins ago | Mule bank: CIMB | Scam type: E-commerce impersonation | Platform: Phone call<br />
-            REASONING:<br />
-            → Time elapsed: 47 mins → Freeze window: OPEN (&lt; 60 mins)<br />
-            → Mule bank identified: CIMB → Primary contact: CIMB Fraud Desk (1300-880-900)<br />
-            → Amount RM12,000 → Priority: HIGH (&gt; RM10K threshold)<br />
-            → Platform: Phone call → Secondary report: MCMC for number takedown<br />
-            → NSRC involvement: YES — cross-bank coordination needed<br />
-            → Police report: Required within 24 hours for investigation<br /><br />
-            <strong>PRIORITY SCORE: CRITICAL</strong><br />
-            ROUTING: CIMB Fraud Desk (first) → NSRC 997 → PDRM e-Reporting
-          </div>
-        );
-        mockResponse = "Saya faham keadaan anda — kita perlu bertindak segera. Satu soalan dulu: nombor akaun yang anda transfer duit tadi, boleh semak dalam resit atau history bank app anda?";
-      } else if (lowerInput.includes('ic') || lowerInput.includes('identity') || lowerInput.includes('kad pengenalan') || lowerInput.includes('password')) {
-        mockReasoning = (
-          <div className="text-xs font-mono text-slate-700 bg-slate-100 p-4 rounded-xl border border-slate-200 leading-relaxed shadow-inner overflow-x-auto">
-            <strong>GLM processing:</strong><br />
-            Detects language: English/BM context<br />
-            Classifies scam type: Identity Theft / Phishing<br />
-            Extracts: Compromised asset = Identity Card / Login Details<br />
-            Calculates: Exposure time = recent → high risk of secondary financial fraud<br />
-            Identifies: Missing information → Which specific services are compromised?<br />
-            Next action: Provide immediate lockdown steps for digital identity.<br />
-            <br />
-            <strong>Stage 2: Case Classification</strong><br />
-            REASONING:<br />
-            → Compromised ID → Risk of unauthorized loans / account takeovers<br />
-            → Priority: HIGH<br />
-            ROUTING: JPN (National Registration Dept) → Credit Tip-Off Service (CTOS) Lock → PDRM
-          </div>
-        );
-        mockResponse = "I understand this is incredibly stressful. Because your personal identity details have been exposed, our first priority is to lock down your credit profile to prevent unauthorized loans. Do you know if your banking passwords were also compromised in the same incident?";
-      } else {
-        mockReasoning = (
-          <div className="text-xs font-mono text-slate-700 bg-slate-100 p-4 rounded-xl border border-slate-200 leading-relaxed shadow-inner overflow-x-auto">
-            <strong>GLM processing:</strong><br />
-            Classifies scam type: Unknown / General Inquiry<br />
-            Identifies: Missing context parameters (Amount? Platform? Method?)<br />
-            Next action: Elicit the core 6W1H parameters to generate a mitigation strategy.<br />
-            ROUTING: Pending further information.
-          </div>
-        );
-        mockResponse = "I am here to assist you through this. To provide you with the exact emergency steps to take, could you let me know if any money was transferred, or if any sensitive accounts were compromised?";
+      if (!res.ok) {
+        let errorMsg = t.error;
+        try {
+          const data = await res.json();
+          if (data?.error) errorMsg = data.error;
+        } catch (e) {}
+        
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: errorMsg }
+        ]);
+        setIsProcessing(false);
+        return;
       }
 
+      const data = await res.json();
+      router.push(`/victim/report/success/${data.id}`);
+    } catch (error) {
       setMessages(prev => [
         ...prev,
-        { role: 'system_reasoning', content: mockReasoning },
-        { role: 'assistant', content: mockResponse }
+        { role: 'assistant', content: t.error }
       ]);
       setIsProcessing(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -307,8 +275,6 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                 className="w-full bg-transparent px-5 py-3 text-[1.05rem] outline-none text-slate-800 placeholder-slate-400 disabled:bg-transparent"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    // TODO: Once Z.AI API key is provided, hook the endpoint here
-                    // Ensure the API call consumes the \`language\` state for i18n
                     e.preventDefault();
                     handleSend();
                   }

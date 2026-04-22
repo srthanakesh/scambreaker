@@ -101,31 +101,28 @@ export async function generateFollowUpTasksForCase(input: {
 
   for (const task of taskTemplates) {
     try {
-      const existingTask = await prisma.followUpTask.findFirst({
+      const created = await prisma.followUpTask.upsert({
         where: {
-          caseId: input.caseId,
+          caseId_dedupeKey: {
+            caseId: input.caseId,
+            dedupeKey: task.dedupeKey,
+          },
+        },
+        update: {
           title: task.title,
+          description: task.description,
+          dueAt: task.dueAt,
+          assignedTo: task.assignedTo,
+        },
+        create: {
+          caseId: input.caseId,
+          dedupeKey: task.dedupeKey,
+          title: task.title,
+          description: task.description,
+          dueAt: task.dueAt,
+          assignedTo: task.assignedTo,
         },
       });
-
-      const created = existingTask
-        ? await prisma.followUpTask.update({
-            where: { id: existingTask.id },
-            data: {
-              description: task.description,
-              dueAt: task.dueAt,
-              assignedTo: task.assignedTo,
-            },
-          })
-        : await prisma.followUpTask.create({
-            data: {
-              caseId: input.caseId,
-              title: task.title,
-              description: task.description,
-              dueAt: task.dueAt,
-              assignedTo: task.assignedTo,
-            },
-          });
 
       await logWorkflowEvent({
         caseId: input.caseId,

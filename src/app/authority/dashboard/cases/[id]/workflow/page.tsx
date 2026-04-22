@@ -78,15 +78,21 @@ export default function WorkflowPage() {
               </div>
               <div>
                 <dt className="text-xs font-bold text-gray-500 uppercase">Assigned Officer</dt>
-                <dd className="text-sm font-bold">Officer #A1024 (Pending)</dd>
+                <dd className="text-sm font-bold">
+                  {caseData.assignedAgency ? `Pending ${caseData.assignedAgency} Agent` : 'Unassigned'}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs font-bold text-gray-500 uppercase">Priority Level</dt>
-                <dd className="text-sm font-bold text-red-600">{caseData.priority}</dd>
+                <dd className={`text-sm font-bold ${
+                  caseData.priority === 'HIGH' || caseData.priority === 'CRITICAL' ? 'text-red-600' : 'text-blue-600'
+                }`}>{caseData.priority}</dd>
               </div>
               <div>
                 <dt className="text-xs font-bold text-gray-500 uppercase">Target Resolution</dt>
-                <dd className="text-sm">Within 48 Hours</dd>
+                <dd className="text-sm">
+                  {caseData.priority === 'CRITICAL' ? 'Immediate' : caseData.priority === 'HIGH' ? 'Within 24 Hours' : 'Within 7 Days'}
+                </dd>
               </div>
             </dl>
           </div>

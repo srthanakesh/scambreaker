@@ -17,6 +17,7 @@ export async function logWorkflowEvent(input: {
       message: input.message,
       actorType: input.actorType,
       actorId: input.actorId,
+      metadata: input.metadata as any ?? undefined,
     },
   });
 }

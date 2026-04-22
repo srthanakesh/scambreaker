@@ -1,3 +1,9 @@
+/**
+ * @deprecated DEAD CODE - AUDIT FINDING (Subphase 2B)
+ * This file and its server actions are currently NOT used by the authority UI components.
+ * The Authority Case Detail page directly calls the `PATCH /api/cases/[id]` route via fetch.
+ * Recommendation: Consider removing this file if not needed elsewhere, or refactoring the UI to use these server actions instead of direct API calls.
+ */
 'use server';
 
 import { revalidatePath } from 'next/cache';
