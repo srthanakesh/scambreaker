@@ -5,9 +5,9 @@ export default function Navbar() {
     <nav className="border-b bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="text-xl font-bold text-blue-600">
-              ScamBreaker
+          <div className="flex-shrink-0 flex items-center cursor-pointer">
+            <Link href="/">
+              <span className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-slate-800 to-slate-500">ScamBreaker</span>
             </Link>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:space-x-8">

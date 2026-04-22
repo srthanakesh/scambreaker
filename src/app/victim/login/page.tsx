@@ -9,7 +9,7 @@ export default function VictimLogin() {
   const [state, formAction, isPending] = useActionState(loginVictimAction, null);
 
   return (
-    <div className="relative min-h-screen bg-[#060a14] text-white overflow-hidden flex flex-col font-sans selection:bg-cyan-500/30">
+    <div className="relative min-h-screen bg-[#060a14] text-white overflow-hidden flex flex-col font-sans selection:bg-cyan-500/30 animate-page-enter">
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-[url('/bgfrontpage.png')] bg-cover bg-center opacity-90 pointer-events-none"
@@ -31,31 +31,13 @@ export default function VictimLogin() {
 
       <main className="relative z-10 flex-grow flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">
-          <h2 className="text-4xl sm:text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 mb-4 drop-shadow-sm">Report an Incident</h2>
-          <p className="text-slate-400 text-lg font-medium tracking-wide">Choose how you wish to proceed with your case.</p>
+          <h2 className="text-4xl sm:text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 mb-4 drop-shadow-sm pb-2">Login or Register to continue</h2>
+          <p className="text-slate-400 text-lg font-medium tracking-wide max-w-2xl mx-auto">Creating an account is highly recommended as it allows you to securely organize and monitor the real-time status of your report.</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl w-full">
-          
-          {/* Guest Login */}
-          <form action={createGuestSessionAction} className="group relative flex flex-col justify-between bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:bg-white/10 transition-all duration-300 hover:shadow-[0_0_30px_rgba(37,99,235,0.2)] hover:-translate-y-1 cursor-pointer text-left focus-within:ring-2 focus-within:ring-blue-500">
-            <button type="submit" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label="Continue as Guest" />
-            <div className="pointer-events-none">
-              <div className="bg-blue-500/20 w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(37,99,235,0.3)]">
-                <UserCircle className="w-8 h-8 text-blue-400" />
-              </div>
-              <h3 className="text-3xl font-bold text-white mb-3">Guest Report</h3>
-              <p className="text-slate-400 leading-relaxed font-medium">
-                Report a cyber incident anonymously. An auto-generated temporary session will be created to track your case.
-              </p>
-            </div>
-            <div className="mt-8 flex items-center text-blue-400 font-bold uppercase tracking-wider group-hover:text-blue-300 pointer-events-none">
-              Continue as Guest <ArrowRight className="ml-2 w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </div>
-          </form>
-
+        <div className="flex justify-center max-w-lg w-full">
           {/* Existing Login */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl w-full">
             <div className="flex items-center gap-4 mb-8">
               <div className="bg-cyan-500/20 w-12 h-12 rounded-full flex items-center justify-center shadow-[0_0_10px_rgba(34,211,238,0.2)]">
                 <UserCheck className="w-6 h-6 text-cyan-400" />
@@ -90,7 +72,6 @@ export default function VictimLogin() {
               </Link>
             </div>
           </div>
-
         </div>
       </main>
     </div>

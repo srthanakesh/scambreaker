@@ -13,7 +13,6 @@ import {
   Mail, 
   MoreHorizontal,
   ArrowRight,
-  CheckCircle2
 } from 'lucide-react';
 
 const incidentTypes = [
@@ -40,8 +39,13 @@ const incidentTypes = [
     icon: Mail,
     title: 'Phishing / Email',
     description: 'Deceptive emails requesting sensitive info or containing malware.',
-  }
+  },
 ];
+
+type ChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
 
 export default function InteractiveReportFlow({ user }: { user: any }) {
   const router = useRouter();
@@ -118,61 +122,65 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#f8fafc] text-slate-900 font-sans overflow-hidden">
-      
-      {/* Left Sidebar Steps */}
       <div className="w-[280px] bg-white border-r border-slate-200 flex flex-col h-full flex-shrink-0">
-        
-        {/* Logo */}
         <div className="h-[72px] flex items-center px-6 border-b border-transparent cursor-pointer">
           <Link href="/">
-            <span className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-slate-800 to-slate-500">ScamBreaker</span>
+            <span className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-slate-800 to-slate-500">
+              ScamBreaker
+            </span>
           </Link>
         </div>
 
         <div className="px-6 pt-8 pb-4">
-          <h2 className="text-[1.35rem] font-medium text-slate-900 leading-tight">Report Incident</h2>
+          <h2 className="text-[1.35rem] font-medium text-slate-900 leading-tight">
+            Report Incident
+          </h2>
           <p className="text-[13px] text-slate-500 mt-1">Process tracking</p>
         </div>
 
         <div className="flex-grow py-4">
           <div className="relative">
-            {/* Step 1 - Active */}
             <div className="relative z-10 flex items-center px-6 py-3 bg-[#e0e7ff] mr-4 rounded-r-full cursor-pointer">
               <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium border-2 border-transparent">
                 1
               </div>
-              <span className="ml-3 text-sm font-semibold text-blue-800">Incident Type</span>
+              <span className="ml-3 text-sm font-semibold text-blue-800">
+                Incident Type
+              </span>
             </div>
 
-            {/* Step Connector Line */}
             <div className="absolute left-[35px] top-6 bottom-[-200px] w-px bg-slate-200 z-0"></div>
 
-            {/* Future Steps */}
             {[
               { num: 2, label: 'Next Steps' },
               { num: 3, label: 'Review' },
-            ].map(step => (
-              <div key={step.num} className="relative z-10 flex items-center px-6 py-4 cursor-not-allowed opacity-70">
+            ].map((step) => (
+              <div
+                key={step.num}
+                className="relative z-10 flex items-center px-6 py-4 cursor-not-allowed opacity-70"
+              >
                 <div className="w-6 h-6 rounded-full bg-white text-slate-500 flex items-center justify-center text-xs font-medium border-2 border-slate-300">
                   {step.num}
                 </div>
-                <span className="ml-3 text-sm font-medium text-slate-600">{step.label}</span>
+                <span className="ml-3 text-sm font-medium text-slate-600">
+                  {step.label}
+                </span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-grow flex flex-col h-full bg-[#f8fafc] overflow-y-auto">
-        
-        {/* Top Navbar */}
         <div className="h-[72px] flex justify-end items-center px-8 border-b border-slate-200 bg-white sticky top-0 z-10">
           <div className="flex items-center space-x-6">
             <button className="text-slate-400 hover:text-slate-600 transition-colors">
               <HelpCircle className="w-5 h-5 fill-slate-500 text-white" />
             </button>
-            <Link href="/victim/dashboard" className="flex items-center text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors">
+            <Link
+              href="/victim/dashboard"
+              className="flex items-center text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+            >
               Cancel Report <X className="w-4 h-4 ml-2" />
             </Link>
           </div>
@@ -206,10 +214,13 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
               </div>
             </div>
 
-            {/* Render dynamic chat history */}
             {messages.map((msg, idx) => (
-              <div key={idx} className={`flex items-start ${msg.role === 'user' ? 'justify-end self-end text-right' : ''}`}>
-                
+              <div
+                key={idx}
+                className={`flex items-start ${
+                  msg.role === 'user' ? 'justify-end self-end text-right' : ''
+                }`}
+              >
                 {msg.role === 'assistant' && (
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-1 border border-blue-200">
                     <Shield className="w-5 h-5 text-blue-600" />
@@ -298,7 +309,6 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
               </p>
             </div>
           </div>
-
         </div>
       </div>
     </div>
