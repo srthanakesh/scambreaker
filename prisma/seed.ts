@@ -7,14 +7,14 @@ async function main() {
   console.log('Start seeding Phase 3...')
 
   // Clear existing data
-  await prisma.followUpTask.deleteMany({});
-  await prisma.authorityTicket.deleteMany({});
-  await prisma.evidence.deleteMany({});
-  await prisma.message.deleteMany({});
-  await prisma.case.deleteMany({});
-  await prisma.user.deleteMany({});
+  await prisma.followUpTask.deleteMany({})
+  await prisma.authorityTicket.deleteMany({})
+  await prisma.evidence.deleteMany({})
+  await prisma.message.deleteMany({})
+  await prisma.case.deleteMany({})
+  await prisma.user.deleteMany({})
 
-  const passwordHash = await bcrypt.hash('password123', 10);
+  const passwordHash = await bcrypt.hash('password123', 10)
 
   const authority = await prisma.user.create({
     data: {
@@ -22,9 +22,11 @@ async function main() {
       password: passwordHash,
       role: 'AUTHORITY',
       fullName: 'Inspector Admin',
+      icNumber: 'N/A',
+      phoneNumber: 'N/A',
     }
-  });
-  console.log(`Created Authority: ${authority.email}`);
+  })
+  console.log(`Created Authority: ${authority.email}`)
 
   const victim = await prisma.user.create({
     data: {
@@ -35,8 +37,8 @@ async function main() {
       icNumber: '900101-14-1234',
       phoneNumber: '012-3456789'
     }
-  });
-  console.log(`Created Victim: ${victim.email}`);
+  })
+  console.log(`Created Victim: ${victim.email}`)
 
   const scenarios = [
     {
@@ -94,7 +96,7 @@ async function main() {
       workflowStatus: 'NEEDS_INFO',
       missingInfo: ['Seller bank account', 'Conversation history']
     }
-  ];
+  ]
 
   for (const s of scenarios) {
     const caseRecord = await prisma.case.create({
@@ -122,11 +124,11 @@ async function main() {
           }
         }
       }
-    });
-    console.log(`Created Phase 3 scenario: ${caseRecord.scamType}`);
+    })
+    console.log(`Created Phase 3 scenario: ${caseRecord.scamType}`)
   }
 
-  console.log('Seeding Phase 3 finished.');
+  console.log('Seeding Phase 3 finished.')
 }
 
 main()
