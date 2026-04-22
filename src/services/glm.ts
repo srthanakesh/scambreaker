@@ -40,6 +40,10 @@ export async function analyzeCase(description: string): Promise<GLMAnalysis> {
   }
 }
 
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function glmAnalyzeCase(description: string): Promise<GLMAnalysis> {
   const apiKey = process.env.GLM_API_KEY;
   if (!apiKey) {
@@ -48,18 +52,12 @@ async function glmAnalyzeCase(description: string): Promise<GLMAnalysis> {
 
   const model = process.env.GLM_MODEL || "glm-4-flash"; // updated to a typical fast model or use what was there before
   
-  const response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert Cybercrime Investigator in Malaysia. 
+  const payload = JSON.stringify({
+    model: model,
+    messages: [
+      {
+        role: "system",
+        content: `You are an expert Cybercrime Investigator in Malaysia. 
           Analyze the victim's scam report and return a JSON object.
           
           Required JSON structure:
@@ -78,19 +76,48 @@ async function glmAnalyzeCase(description: string): Promise<GLMAnalysis> {
           }
           
           Malaysian Agencies to use for assignedAgency: [PDRM CCID, MCMC, Bank Negara Malaysia, NSRC, KPDN].`
-        },
-        {
-          role: "user",
-          content: `Analyze this scam report: "${description}"`
-        }
-      ],
-      temperature: 0.1,
-    }),
+      },
+      {
+        role: "user",
+        content: `Analyze this scam report: "${description}"`
+      }
+    ],
+    temperature: 0.1,
   });
+  const maxAttempts = 3;
+  let response: Response | null = null;
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    // We attach the response to the error object so the catch block can log it
-    const error: any = new Error(`GLM API returned status ${response.status}`);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: payload,
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        break;
+      }
+      lastError = new Error(`GLM API returned status ${response.status}`);
+    } catch (err) {
+      lastError = err as Error;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (attempt < maxAttempts) {
+      await sleep(300 * Math.pow(2, attempt - 1));
+    }
+  }
+
+  if (!response || !response.ok) {
+    const error: any = lastError || new Error("GLM API request failed.");
     error.response = response;
     throw error;
   }
