@@ -1,52 +1,72 @@
 import Link from 'next/link';
-import { Shield, ShieldAlert, FileText, ArrowRight } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-center items-center p-4">
-      <div className="max-w-4xl w-full space-y-12 text-center">
-        <div className="space-y-4">
-          <Shield className="mx-auto h-20 w-20 text-blue-500" />
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl text-white">
-            Scam<span className="text-blue-500">Breaker</span>
-          </h1>
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-            The national reporting and intelligence platform for cybercrime in Malaysia.
-          </p>
-        </div>
+    <div className="relative min-h-screen bg-[#060a14] text-white overflow-hidden flex flex-col font-sans selection:bg-cyan-500/30">
+      {/* Background Image using pseudo-element or absolute div */}
+      <div 
+        className="absolute inset-0 bg-[url('/bgfrontpage.png')] bg-cover bg-center opacity-90 pointer-events-none"
+        style={{ animation: 'floatBg 25s ease-in-out infinite', transform: 'scale(1.05)' }}
+      ></div>
+      <div className="absolute inset-0 bg-black/10 z-0 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_10%,rgba(0,0,0,0.7)_100%)] z-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.8)]"></div>
+      
+      {/* Navigation */}
+      <nav className="relative z-10 border-b border-white/5 bg-transparent backdrop-blur-[2px]">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex justify-between items-center h-24">
+            
+            {/* Logo */}
+            <div className="flex-shrink-0 cursor-pointer">
+              <span className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400">ScamBreaker</span>
+            </div>
+            
+            {/* Nav Items - Center - strictly as requested */}
+            <div className="hidden md:flex space-x-8 absolute left-1/2 -translate-x-1/2">
+              <span className="text-sm font-bold tracking-[0.2em] text-slate-300 hover:text-white transition-colors cursor-pointer uppercase">
+                How It Works
+              </span>
+            </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto mt-12">
-          {/* Victim Portal */}
-          <div className="bg-slate-800 rounded-xl p-8 border border-slate-700 hover:border-blue-500 transition-colors flex flex-col h-full text-left group">
-            <FileText className="h-10 w-10 text-blue-400 mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">I am a Victim</h2>
-            <p className="text-slate-400 mb-8 flex-grow">
-              Report a scam, track your case status, and securely communicate with assigned authorities.
-            </p>
-            <Link 
-              href="/victim/login" 
-              className="inline-flex items-center text-blue-400 font-semibold group-hover:text-blue-300"
-            >
-              Enter Victim Portal <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </div>
-
-          {/* Authority Portal */}
-          <div className="bg-slate-800 rounded-xl p-8 border border-slate-700 hover:border-red-500 transition-colors flex flex-col h-full text-left group">
-            <ShieldAlert className="h-10 w-10 text-red-400 mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">I am an Authority</h2>
-            <p className="text-slate-400 mb-8 flex-grow">
-              Review scam reports, assign investigations, and access AI-driven case analysis.
-            </p>
-            <Link 
-              href="/authority/login" 
-              className="inline-flex items-center text-red-400 font-semibold group-hover:text-red-300"
-            >
-              Enter Authority Portal <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
+            {/* Nav Items - Right */}
+            <div className="flex items-center">
+              <Link
+                href="/authority/login"
+                className="bg-cyan-500 hover:bg-cyan-400 text-[#0b1120] font-bold py-2.5 px-6 rounded shadow-[0_0_15px_rgba(34,211,238,0.3)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:-translate-y-0.5 text-xs sm:text-sm uppercase tracking-wider"
+              >
+                Authority Login
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="relative z-10 flex-grow flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 text-center pt-8 pb-12">
+        
+        {/* Hero Title */}
+        <h1 className="text-6xl sm:text-8xl lg:text-9xl font-black tracking-tighter leading-[1.05] mb-12 text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-sm">
+          ScamBreaker
+        </h1>
+        
+        {/* Call to Action */}
+        <div className="flex flex-col sm:flex-row gap-6">
+          <Link
+            href="/victim/login"
+            className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-10 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(37,99,235,0.6)] hover:-translate-y-1 sm:text-lg uppercase tracking-wide"
+          >
+            Report Case Now
+          </Link>
+        </div>
+
+
+
+        <div className="mt-auto pt-8">
+          <ChevronDown className="w-6 h-6 text-slate-600 animate-bounce cursor-pointer hover:text-cyan-400 transition-colors" />
+        </div>
+      </main>
+
     </div>
   );
 }

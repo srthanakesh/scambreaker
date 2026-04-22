@@ -38,6 +38,38 @@ export async function login(formData: FormData, roleFilter?: 'VICTIM' | 'AUTHORI
   }
 }
 
+export async function loginVictimAction(prevState: any, formData: FormData) {
+  return login(formData, 'VICTIM');
+}
+
+export async function loginAuthorityAction(prevState: any, formData: FormData) {
+  return login(formData, 'AUTHORITY');
+}
+
+export async function createGuestSessionAction() {
+  const timestamp = Date.now();
+  const passwordHash = await bcrypt.hash(Math.random().toString(36), 10);
+
+  const user = await prisma.user.create({
+    data: {
+      email: `guest_${timestamp}@anonymous.local`,
+      password: passwordHash,
+      fullName: 'Guest User',
+      icNumber: `GUEST-${timestamp}`,
+      phoneNumber: `000000000${String(timestamp).slice(-1)}`,
+      role: 'VICTIM',
+    },
+  });
+
+  await createSession({
+    userId: user.id,
+    role: user.role,
+    email: user.email,
+  });
+
+  redirect('/victim/dashboard');
+}
+
 export async function register(formData: FormData) {
   const email = (formData.get('email') as string)?.trim().toLowerCase();
   const password = (formData.get('password') as string)?.trim();
