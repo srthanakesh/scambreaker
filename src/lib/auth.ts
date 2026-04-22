@@ -2,8 +2,12 @@ import { jwtVerify, SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 
 const rawJwtSecret = process.env.JWT_SECRET;
-if (!rawJwtSecret && process.env.NODE_ENV === 'production') {
-  throw new Error('JWT_SECRET must be configured in production.');
+if (!rawJwtSecret) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be configured in production.');
+  } else {
+    console.warn('⚠️  JWT_SECRET is missing. Using unsafe fallback for development.');
+  }
 }
 const JWT_SECRET = new TextEncoder().encode(rawJwtSecret || 'super-secret-key-for-scambreaker-dev');
 const COOKIE_NAME = 'sb_session';

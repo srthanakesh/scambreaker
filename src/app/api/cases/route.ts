@@ -45,7 +45,6 @@ export async function POST(request: Request) {
         assignedAgency: analysis.assignedAgency,
         priority: analysis.priority,
         workflowStatus: analysis.workflowStatus,
-        documents: analysis.documents,
         // Create authority ticket
         ticket: {
           create: {

@@ -2,14 +2,16 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import {
-  Shield,
-  HelpCircle,
-  X,
-  ShoppingCart,
-  TrendingUp,
-  UserSquare2,
-  Mail,
+import { useRouter } from 'next/navigation';
+import { 
+  Shield, 
+  HelpCircle, 
+  X, 
+  ShoppingCart, 
+  TrendingUp, 
+  UserSquare2, 
+  Mail, 
+  MoreHorizontal,
   ArrowRight,
 } from 'lucide-react';
 
@@ -46,48 +48,40 @@ type ChatMessage = {
 };
 
 export default function InteractiveReportFlow({ user }: { user: any }) {
+  const router = useRouter();
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<Array<{role: string, content: React.ReactNode}>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [language, setLanguage] = useState<'en' | 'ms' | 'zh' | 'ta'>('en');
 
   const t = {
     en: {
       hello: `Hello, ${user.fullName.split(' ')[0]}. I am the ScamBreaker incident intake assistant.`,
-      instruction:
-        'Please tell me what happened. Include any details like names, numbers, or websites. This helps me send your report to the right team.',
-      error:
-        'Failed to submit report. Please try again.',
+      instruction: `Please tell me what happened. Include any details like names, numbers, or websites. This helps me send your report to the right team.`,
+      error: `An error occurred while submitting your report. Please try again.`,
     },
     ms: {
       hello: `Helo, ${user.fullName.split(' ')[0]}. Saya ialah pembantu penerimaan insiden ScamBreaker.`,
-      instruction:
-        'Sila beritahu saya apa yang berlaku. Sertakan butiran seperti nama, nombor, atau laman web. Ini membantu saya menghantar laporan anda ke pasukan yang betul.',
-      error:
-        'Gagal menghantar laporan. Sila cuba lagi.',
+      instruction: `Sila beritahu saya apa yang berlaku. Sertakan butiran seperti nama, nombor, atau laman web. Ini membantu saya menghantar laporan anda ke pasukan yang betul.`,
+      error: `Ralat berlaku semasa menghantar laporan anda. Sila cuba lagi.`,
     },
     zh: {
       hello: `你好，${user.fullName.split(' ')[0]}。我是 ScamBreaker 事件记录助手。`,
-      instruction:
-        '请告诉我发生了什么事情。请包含姓名、电话号码或网站等详细信息。这将帮助我将您的报告发送给正确的团队。',
-      error:
-        '提交报告失败。请再试一次。',
+      instruction: `请告诉我发生了什么事情。请包含姓名、电话号码或网站等详细信息。这将帮助我将您的报告发送给正确的团队。`,
+      error: `提交报告时出错。请重试。`,
     },
     ta: {
       hello: `வணக்கம், ${user.fullName.split(' ')[0]}. நான் ScamBreaker சம்பவ பதிவு உதவியாளர்.`,
-      instruction:
-        'என்ன நடந்தது என்று சொல்லுங்கள். பெயர்கள், எண்கள் அல்லது இணையதளங்கள் போன்ற விவரங்களைச் சேர்க்கவும். உங்கள் அறிக்கையை சரியான குழுவிற்கு அனுப்ப இது உதவும்.',
-      error:
-        'அறிக்கையை சமர்ப்பிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
-    },
+      instruction: `என்ன நடந்தது என்று சொல்லுங்கள். பெயர்கள், எண்கள் அல்லது இணையதளங்கள் போன்ற விவரங்களைச் சேர்க்கவும். உங்கள் அறிக்கையை சரியான குழுவிற்கு அனுப்ப இது உதவும்.`,
+      error: `உங்கள் அறிக்கையை சமர்ப்பிக்கும் போது பிழை ஏற்பட்டது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.`,
+    }
   }[language];
 
   const handleSend = async () => {
     if (!input.trim() || isProcessing) return;
 
     const userMsg = input.trim();
-
-    setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
     setIsProcessing(true);
 
@@ -97,29 +91,31 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          rawDescription: userMsg,
-        }),
+        body: JSON.stringify({ rawDescription: userMsg }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data?.error || t.error);
+        let errorMsg = t.error;
+        try {
+          const data = await res.json();
+          if (data?.error) errorMsg = data.error;
+        } catch (e) {}
+        
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: errorMsg }
+        ]);
+        setIsProcessing(false);
+        return;
       }
 
-      window.location.href = `/victim/report/success/${data.id}`;
+      const data = await res.json();
+      router.push(`/victim/report/success/${data.id}`);
     } catch (error) {
-      console.error('Report submission failed:', error);
-
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
-        {
-          role: 'assistant',
-          content: t.error,
-        },
+        { role: 'assistant', content: t.error }
       ]);
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -190,8 +186,13 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
           </div>
         </div>
 
+        {/* Content Body: Chat Interface */}
         <div className="flex-grow flex flex-col relative max-w-4xl w-full mx-auto w-[100%]">
+          
+          {/* Chat Messages Area */}
           <div className="flex-grow overflow-y-auto px-8 py-8 space-y-8 flex flex-col">
+            
+            {/* Assistant Welcome Message */}
             <div className="flex items-start max-w-[85%]">
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-1 border border-blue-200">
                 <Shield className="w-5 h-5 text-blue-600" />
@@ -203,48 +204,12 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                 <p className="text-[1.05rem] text-slate-700 leading-relaxed mt-2 mb-4">
                   {t.instruction}
                 </p>
-
+                
                 <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100">
-                  <button
-                    onClick={() => setLanguage('en')}
-                    className={`text-sm px-4 py-1.5 rounded-full border transition-all ${
-                      language === 'en'
-                        ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    English
-                  </button>
-                  <button
-                    onClick={() => setLanguage('ms')}
-                    className={`text-sm px-4 py-1.5 rounded-full border transition-all ${
-                      language === 'ms'
-                        ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    Bahasa Melayu
-                  </button>
-                  <button
-                    onClick={() => setLanguage('zh')}
-                    className={`text-sm px-4 py-1.5 rounded-full border transition-all ${
-                      language === 'zh'
-                        ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    中文 (Mandarin)
-                  </button>
-                  <button
-                    onClick={() => setLanguage('ta')}
-                    className={`text-sm px-4 py-1.5 rounded-full border transition-all ${
-                      language === 'ta'
-                        ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    தமிழ்
-                  </button>
+                  <button onClick={() => setLanguage('en')} className={`text-sm px-4 py-1.5 rounded-full border transition-all ${language === 'en' ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}>English</button>
+                  <button onClick={() => setLanguage('ms')} className={`text-sm px-4 py-1.5 rounded-full border transition-all ${language === 'ms' ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Bahasa Melayu</button>
+                  <button onClick={() => setLanguage('zh')} className={`text-sm px-4 py-1.5 rounded-full border transition-all ${language === 'zh' ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}>中文 (Mandarin)</button>
+                  <button onClick={() => setLanguage('ta')} className={`text-sm px-4 py-1.5 rounded-full border transition-all ${language === 'ta' ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}>தமிழ்</button>
                 </div>
               </div>
             </div>
@@ -262,27 +227,31 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                   </div>
                 )}
 
-                <div
-                  className={`mx-4 px-6 py-4 shadow-sm max-w-[85%] ${
-                    msg.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm text-left'
-                      : 'bg-white border border-slate-200 rounded-2xl rounded-tl-sm text-slate-800'
-                  }`}
-                >
-                  <p
-                    className={`text-[1.05rem] leading-relaxed ${
-                      msg.role === 'assistant' ? 'font-medium' : ''
-                    }`}
-                  >
-                    {msg.content}
-                  </p>
+                {msg.role === 'system_reasoning' && (
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-1 border border-purple-200">
+                    <MoreHorizontal className="w-5 h-5 text-purple-600" />
+                  </div>
+                )}
+                
+                <div className={`mx-4 px-6 py-4 shadow-sm max-w-[85%] ${
+                  msg.role === 'user' 
+                    ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm text-left' 
+                    : msg.role === 'system_reasoning'
+                    ? ''
+                    : 'bg-white border border-slate-200 rounded-2xl rounded-tl-sm text-slate-800'
+                }`}>
+                  {typeof msg.content === 'string' ? (
+                    <p className={`text-[1.05rem] leading-relaxed ${msg.role === 'assistant' ? 'font-medium' : ''}`}>
+                      {msg.content}
+                    </p>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
 
                 {msg.role === 'user' && (
                   <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 mt-1 overflow-hidden">
-                    <span className="text-sm font-bold text-slate-500">
-                      {(user.fullName?.[0] || 'U').toUpperCase()}
-                    </span>
+                    <span className="text-sm font-bold text-slate-500">{(user.fullName[0] || 'U').toUpperCase()}</span>
                   </div>
                 )}
               </div>
@@ -296,32 +265,24 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                 <div className="ml-4 bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-6 py-4 shadow-sm">
                   <div className="flex space-x-2 items-center h-5">
                     <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
-                      style={{ animationDelay: '0.2s' }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
-                      style={{ animationDelay: '0.4s' }}
-                    ></div>
+                    <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                   </div>
                 </div>
               </div>
             )}
+
           </div>
 
+          {/* Chat Input Area */}
           <div className="p-6 bg-[#f8fafc] bg-opacity-95 backdrop-blur sticky bottom-0">
-            <div
-              className={`relative flex items-center bg-white border rounded-full shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all overflow-hidden p-2 ${
-                isProcessing ? 'border-slate-200 opacity-70' : 'border-slate-300'
-              }`}
-            >
-              <input
-                type="text"
+            <div className={`relative flex items-center bg-white border rounded-full shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all overflow-hidden p-2 ${isProcessing ? 'border-slate-200 opacity-70' : 'border-slate-300'}`}>
+              <input 
+                type="text" 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={isProcessing}
-                placeholder="Type here..."
+                placeholder="Type here..." 
                 className="w-full bg-transparent px-5 py-3 text-[1.05rem] outline-none text-slate-800 placeholder-slate-400 disabled:bg-transparent"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -330,12 +291,12 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                   }
                 }}
               />
-              <button
+              <button 
                 disabled={!input.trim() || isProcessing}
                 onClick={handleSend}
                 className={`ml-2 w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-full transition-all ${
                   input.trim() && !isProcessing
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' 
                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 }`}
               >
@@ -344,8 +305,7 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
             </div>
             <div className="mt-3 text-center">
               <p className="text-xs text-slate-400 font-medium tracking-wide">
-                ScamBreaker Assistant uses AI to interpret and route your initial case
-                parameters.
+                ScamBreaker Assistant uses AI to interpret and route your initial case parameters.
               </p>
             </div>
           </div>

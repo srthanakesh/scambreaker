@@ -1,3 +1,5 @@
+import { ZAI_SYSTEM_PROMPT } from '../lib/prompts/zai-system-prompt';
+
 export type Urgency = 'LOW' | 'MEDIUM' | 'HIGH';
 export type Priority = 'NORMAL' | 'HIGH';
 export type WorkflowStatus = 'NEW' | 'ANALYZED' | 'NEEDS_INFO' | 'ROUTED' | 'CLOSED';
@@ -14,8 +16,6 @@ export interface GLMAnalysis {
   suggestedRouting: string;
   assignedAgency: string;
   workflowStatus: WorkflowStatus;
-  documents: Array<{ title: string; content: string }>;
-  tasks: Array<{ title: string; description: string; dueDays: number }>;
   confidence: number;
 }
 
@@ -26,16 +26,20 @@ export async function analyzeCase(description: string): Promise<GLMAnalysis> {
     console.log("GLM Analysis Successful:", analysis.scamType);
     return analysis;
   } catch (error: any) {
-    console.error("GLM Analysis Failed:", error.message);
-    if (error.response) {
-      try {
-        const errorText = await error.response.text();
-        console.error("API Error Details:", errorText);
-      } catch (e) {
-        // ignore if we can't read response text
+    if (error.message === "GLM_API_KEY is not configured in environment variables.") {
+      console.warn("⚠️  GLM_API_KEY is missing. Falling back to mock analysis. Please set GLM_API_KEY in your .env file.");
+    } else {
+      console.error("GLM Analysis Failed:", error.message);
+      if (error.response) {
+        try {
+          const errorText = await error.response.text();
+          console.error("API Error Details:", errorText);
+        } catch (e) {
+          // ignore if we can't read response text
+        }
       }
+      console.log("GLM failure fallback used.");
     }
-    console.log("GLM failure fallback used.");
     return mockAnalyzeCase(description);
   }
 }
@@ -57,25 +61,7 @@ async function glmAnalyzeCase(description: string): Promise<GLMAnalysis> {
     messages: [
       {
         role: "system",
-        content: `You are an expert Cybercrime Investigator in Malaysia. 
-          Analyze the victim's scam report and return a JSON object.
-          
-          Required JSON structure:
-          {
-            "detectedLanguage": "string",
-            "scamType": "string",
-            "amountLost": number,
-            "urgency": "LOW|MEDIUM|HIGH",
-            "priority": "NORMAL|HIGH",
-            "summary": "string",
-            "missingInfo": ["string"],
-            "suggestedStep": "string",
-            "suggestedRouting": "string",
-            "assignedAgency": "string",
-            "confidence": number
-          }
-          
-          Malaysian Agencies to use for assignedAgency: [PDRM CCID, MCMC, Bank Negara Malaysia, NSRC, KPDN].`
+        content: ZAI_SYSTEM_PROMPT
       },
       {
         role: "user",
@@ -134,10 +120,10 @@ async function glmAnalyzeCase(description: string): Promise<GLMAnalysis> {
 
   const analysis = JSON.parse(jsonString);
 
-  return normalizeAnalysis(analysis, description);
+  return normalizeAnalysis(analysis);
 }
 
-function normalizeAnalysis(raw: any, description: string): GLMAnalysis {
+function normalizeAnalysis(raw: any): GLMAnalysis {
   let fallbackUsed = false;
 
   const safeNumber = (val: any, defaultVal: number) => {
@@ -187,25 +173,6 @@ function normalizeAnalysis(raw: any, description: string): GLMAnalysis {
 
   let workflowStatus: WorkflowStatus = missingInfo.length > 0 ? "NEEDS_INFO" : "ROUTED";
 
-  // Standard Malaysian Task Templates
-  const tasks = [
-    { title: "Contact NSRC", description: "Call 997 immediately to block the mule account.", dueDays: 0 }
-  ];
-  if (amountLost > 500) {
-    tasks.push({ title: "Lodge Police Report", description: "Visit the nearest station with all evidence.", dueDays: 1 });
-  }
-  if (missingInfo.length > 0) {
-    tasks.push({ title: "Upload Evidence", description: `Please provide: ${missingInfo.join(", ")}`, dueDays: 2 });
-  }
-
-  // Standard Document Templates
-  const documents = [
-    {
-      title: "Draft Police Report",
-      content: `PDRM REPORT DRAFT\n\nIncident: ${safeString(raw.scamType, "UNKNOWN")}\nSummary: ${safeString(raw.summary, "Analysis incomplete. Manual review required.")}\nAmount: RM ${amountLost}\nDetails: ${description.substring(0, 100)}...`
-    }
-  ];
-
   if (fallbackUsed) {
     console.log("Normalization fallback used for some missing or invalid fields.");
   }
@@ -222,8 +189,6 @@ function normalizeAnalysis(raw: any, description: string): GLMAnalysis {
     suggestedRouting: safeString(raw.suggestedRouting, "General Triage"),
     assignedAgency: safeString(raw.assignedAgency, "PDRM CCID"),
     workflowStatus,
-    documents,
-    tasks,
     confidence: safeNumber(raw.confidence, 0.5)
   };
 }
@@ -241,8 +206,6 @@ export function mockAnalyzeCase(description: string): GLMAnalysis {
     suggestedRouting: "General Triage",
     assignedAgency: "Manual Review Unit",
     workflowStatus: "NEEDS_INFO",
-    documents: [{ title: "Incident Brief", content: description }],
-    tasks: [{ title: "Manual Verification", description: "An officer needs to verify this case.", dueDays: 1 }],
     confidence: 0
   };
 }
