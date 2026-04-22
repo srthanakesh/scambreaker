@@ -28,7 +28,7 @@ export default function WorkflowPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6 text-gray-900">
       <div className="flex items-center gap-4 mb-6">
-        <Link href={`/dashboard/cases/${id}`} className="text-blue-600 font-bold">&larr; Back to Case</Link>
+        <Link href={`/authority/dashboard/cases/${id}`} className="text-blue-600 font-bold">&larr; Back to Case</Link>
         <h1 className="text-2xl font-bold">Official Workflow: {caseData.assignedAgency}</h1>
       </div>
 
@@ -37,27 +37,33 @@ export default function WorkflowPage() {
           <div className="bg-white p-6 rounded-lg border shadow-sm">
             <h2 className="text-lg font-bold mb-4 border-b pb-2">Agency Checklist</h2>
             <div className="space-y-3">
-              {[
-                "Verify Victim Identity",
-                "Cross-reference Bank Accounts",
-                "Flag Transaction in NSRC Database",
-                "Initiate Communication with Recipient Bank",
-                "Update Police Investigation File"
-              ].map((item, i) => (
-                <label key={i} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer border border-transparent hover:border-gray-200">
-                  <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  <span className="text-sm font-medium">{item}</span>
-                </label>
-              ))}
+              {(caseData.followUpTasks?.length ?? 0) === 0 ? (
+                <p className="text-sm text-gray-500">No workflow tasks available.</p>
+              ) : (
+                caseData.followUpTasks.map((task: any) => (
+                  <div key={task.id} className="flex items-center justify-between p-2 rounded border border-gray-200">
+                    <div>
+                      <p className="text-sm font-medium">{task.title}</p>
+                      <p className="text-xs text-gray-500">{task.description}</p>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded ${
+                      task.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {task.status}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           <div className="bg-white p-6 rounded-lg border shadow-sm">
             <h2 className="text-lg font-bold mb-4 border-b pb-2">Next Required Step</h2>
             <div className="p-4 bg-blue-50 border border-blue-100 rounded">
-              <p className="text-sm font-bold text-blue-900">Inter-agency Handover</p>
-              <p className="text-xs text-blue-800 mt-1">Pending response from CCID regarding suspect's mule account history.</p>
-              <button className="mt-4 bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold w-full">Request Agency Update</button>
+              <p className="text-sm font-bold text-blue-900">{caseData.workflowStatus}</p>
+              <p className="text-xs text-blue-800 mt-1">
+                {caseData.summary || 'No case summary available.'}
+              </p>
             </div>
           </div>
         </div>
@@ -88,9 +94,15 @@ export default function WorkflowPage() {
           <div className="bg-gray-900 text-white p-6 rounded-lg shadow-sm">
             <h2 className="text-lg font-bold mb-4 border-b border-gray-700 pb-2">System Logs</h2>
             <div className="space-y-2 font-mono text-[10px] opacity-80">
-              <p>[{new Date().toISOString()}] - Case Analyzed by GLM</p>
-              <p>[{new Date().toISOString()}] - Routed to {caseData.assignedAgency}</p>
-              <p>[{new Date().toISOString()}] - Official Workflow Initialized</p>
+              {(caseData.workflowLogs?.length ?? 0) === 0 ? (
+                <p>No workflow logs available.</p>
+              ) : (
+                caseData.workflowLogs.slice(0, 10).map((log: any) => (
+                  <p key={log.id}>
+                    [{new Date(log.createdAt).toISOString()}] - {log.eventType}: {log.message}
+                  </p>
+                ))
+              )}
             </div>
           </div>
         </div>
