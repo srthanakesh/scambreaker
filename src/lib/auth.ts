@@ -1,8 +1,11 @@
 import { jwtVerify, SignJWT } from 'jose';
 import { cookies } from 'next/headers';
-import { NextRequest } from 'next/server';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'super-secret-key-for-scambreaker-dev');
+const rawJwtSecret = process.env.JWT_SECRET;
+if (!rawJwtSecret && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET must be configured in production.');
+}
+const JWT_SECRET = new TextEncoder().encode(rawJwtSecret || 'super-secret-key-for-scambreaker-dev');
 const COOKIE_NAME = 'sb_session';
 
 export type SessionPayload = {

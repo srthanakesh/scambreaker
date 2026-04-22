@@ -6,7 +6,6 @@ datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
-
 enum Role {
   VICTIM
   AUTHORITY
@@ -15,11 +14,11 @@ enum Role {
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
-  password    String   
+  password    String
   role        Role     @default(VICTIM)
   fullName    String
-  icNumber    String?
-  phoneNumber String?
+  icNumber    String
+  phoneNumber String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -52,6 +51,7 @@ model Case {
   evidence         Evidence[]
   ticket           AuthorityTicket?
   followUpTasks    FollowUpTask[]
+  workflowLogs     WorkflowLog[]
 }
 
 model FollowUpTask {
@@ -60,10 +60,26 @@ model FollowUpTask {
   case        Case      @relation(fields: [caseId], references: [id])
   title       String
   description String
+  assignedTo  String?
   dueAt       DateTime?
+  dedupeKey   String?
   status      String    @default("PENDING") // PENDING, COMPLETED
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@unique([caseId, dedupeKey])
+}
+
+model WorkflowLog {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  eventType String
+  message   String
+  actorType String
+  actorId   String?
+  metadata  Json?
+  createdAt DateTime @default(now())
 }
 
 model AuthorityTicket {
