@@ -1,5 +1,6 @@
 import { ZAI_SYSTEM_PROMPT } from '../lib/prompts/zai-system-prompt';
 import { DOCUMENT_GENERATION_PROMPT } from '../lib/prompts/document-generation-prompt';
+import { malaysiaBanks } from '../lib/malaysia-banks';
 
 export type Urgency = 'LOW' | 'MEDIUM' | 'HIGH';
 export type Priority = 'NORMAL' | 'HIGH';
@@ -157,6 +158,155 @@ export async function chatWithGLM(messages: ChatMessage[]): Promise<string> {
   const response = await fetchWithModelFallback(apiKey, basePayload);
   const result = await response.json();
   return result.choices?.[0]?.message?.content || "";
+}
+
+export async function restructureStatement(rawDescription: string, userDetails: any, attachments?: Array<{ file_name: string; file_type: string }>, ocrExtractions?: Array<{ source_file: string; ocr_text: string; confidence: number }>): Promise<string> {
+  const apiKey = process.env.GLM_API_KEY;
+  if (!apiKey) {
+    console.warn('[GLM] API key not found, skipping statement restructuring');
+    return rawDescription;
+  }
+
+  const victimName = userDetails.fullName || userDetails.name || "-";
+  const victimEmail = userDetails.email || "-";
+  const victimPhone = userDetails.phoneNumber || userDetails.phone || "-";
+  const victimIC = userDetails.icNumber || "-";
+
+  const attachmentsList = attachments && attachments.length > 0
+    ? attachments.map(a => `${a.file_name} (${a.file_type})`).join("; ")
+    : "No";
+
+  const ocrContext = ocrExtractions && ocrExtractions.length > 0
+    ? `\n\n[INTERNAL OCR DATA — Use this only to improve understanding. Do NOT expose raw OCR text, confidence scores, or extraction markers in the output.]\n${ocrExtractions.map(e => `File: ${e.source_file}\nConfidence: ${e.confidence}\nText: ${e.ocr_text}`).join("\n\n")}`
+    : "";
+
+  const bankRefTable = malaysiaBanks.map(b =>
+    `${b.short_name} (aliases: ${b.aliases.join(', ')})`
+  ).join('\n');
+
+  const systemPrompt = `You are the Victim Statement Structuring Agent for ScamBreaker Malaysia.
+
+Your task is to transform messy, emotional, fragmented, or shorthand scam reports into a professional, structured victim statement for case review by authorities.
+
+STRICT RULES:
+1. Do NOT invent facts. Do NOT guess missing information.
+2. If a value is missing, unclear, or not provided, output "-".
+3. Victim identity details must come from the provided database fields only.
+4. Do NOT repeat full victim identity details inside the statement paragraph unless necessary for readability.
+5. Rewrite shorthand, broken grammar, slang, and numbering into proper formal English.
+6. Convert obvious money values into proper currency format (e.g., rm20k -> RM20,000, rm150k -> RM150,000).
+7. Standardize dates and times where obvious, but do not guess.
+8. If attachments exist, show them as metadata only — do NOT paste OCR output into the visible statement, do NOT show extraction confidence, do NOT show BEGIN EXTRACTED TEXT / END EXTRACTED TEXT markers.
+9. Hidden OCR/extracted text may be used internally to improve understanding only.
+10. Only include information from OCR in the final statement if clearly relevant, reliable, and naturally rewritten.
+11. Never expose raw extraction text in the final output.
+12. Keep the tone professional, neutral, and concise.
+13. Write like a cleaned formal case intake record — not like an AI assistant.
+14. BANK NAME NORMALIZATION: When the victim mentions any bank name, short name, nickname, or app name (e.g., "m2u", "mae", "cimb clicks", "hlb", "pbb", "gxbank"), you MUST resolve it to the official short_name from the bank reference table below. For example: "m2u" -> "Maybank", "octo" -> "CIMB", "hlb" -> "Hong Leong", "gxbank" -> "GX Bank". Always use the official short_name in the output fields.
+
+FIELD EXTRACTION GUIDELINES:
+Extract these carefully from the raw input:
+- scam type (e.g., Loan scam, Investment scam, Job scam, Parcel scam, Love scam, Impersonation scam, E-commerce scam, Banking phishing scam, Account takeover scam, Education loan scam, Housing loan scam, Unknown / suspected scam)
+- amount
+- payment method
+- date and time of incident
+- reporting date
+- source bank
+- destination bank
+- communication channel / platform / app / site used
+- relevant names or entities
+- transaction direction
+- reason victim believed the transfer/request
+- urgency clues
+
+If unclear, use "-".
+
+OUTPUT MUST be valid JSON matching this structure exactly:
+
+{
+  "victim_details": {
+    "name": "${victimName}",
+    "email": "${victimEmail}",
+    "phone_number": "${victimPhone}",
+    "ic_number": "${victimIC}"
+  },
+  "structured_statement": {
+    "summary": {
+      "scam_type": "...",
+      "amount_involved": "...",
+      "payment_method": "...",
+      "date_time_of_incident": "...",
+      "reporting_date": "...",
+      "source_bank": "...",
+      "destination_bank": "...",
+      "channel_used": "...",
+      "suspected_scam_pattern": "...",
+      "attachments_provided": "Yes / No"
+    },
+    "victim_statement": "Write a clean formal paragraph or short multi-paragraph statement describing what happened. Professional, neutral, concise. No dramatic language, no legal conclusions, no assumptions."
+  },
+  "attachments": ["file1.jpg (uploaded image)", "file2.pdf (uploaded document)"]
+}
+
+Rules:
+- Output raw JSON only. No markdown formatting.
+- Do not guess missing facts. If unclear, use "-".
+- Keep output professional and concise.
+- Convert shorthand money values into proper RM format.
+- Convert messy numbering into readable format.
+- The attachments array should list file names and types. If none, use an empty array [].
+- IMPORTANT: source_bank and destination_bank MUST use the official short_name from the bank reference table. Never use nicknames, app names, or aliases as the bank value in the output.
+
+MALAYSIA BANK REFERENCE TABLE (use short_name for output fields):
+${bankRefTable}`;
+
+  const basePayload = {
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `database_victim_details:\n${JSON.stringify({ name: victimName, email: victimEmail, phone_number: victimPhone, ic_number: victimIC })}\n\nraw_user_input:\n"${rawDescription}"\n\nattachments:\n${attachments ? JSON.stringify(attachments) : "[]"}${ocrContext}` }
+    ],
+    temperature: 0.1,
+  };
+
+  try {
+    const response = await fetchWithModelFallback(apiKey, basePayload);
+    const result = await response.json();
+    let content = result.choices?.[0]?.message?.content || "";
+
+    content = content.replace(/\`\`\`json\n?|\n?\`\`\`/g, '').trim();
+    const parsed = JSON.parse(content);
+
+    const attList = Array.isArray(parsed.attachments) && parsed.attachments.length > 0
+      ? parsed.attachments.map((a: string) => `- ${a}`).join('\n')
+      : '-';
+
+    return `Victim Details
+- Name: ${parsed.victim_details?.name || '-'}
+- Email: ${parsed.victim_details?.email || '-'}
+- Phone Number: ${parsed.victim_details?.phone_number || '-'}
+- IC Number: ${parsed.victim_details?.ic_number || '-'}
+
+Statement Summary
+- Scam Type: ${parsed.structured_statement?.summary?.scam_type || '-'}
+- Amount Involved: ${parsed.structured_statement?.summary?.amount_involved || '-'}
+- Payment Method: ${parsed.structured_statement?.summary?.payment_method || '-'}
+- Date/Time of Incident: ${parsed.structured_statement?.summary?.date_time_of_incident || '-'}
+- Reporting Date: ${parsed.structured_statement?.summary?.reporting_date || '-'}
+- Source Bank: ${parsed.structured_statement?.summary?.source_bank || '-'}
+- Destination Bank: ${parsed.structured_statement?.summary?.destination_bank || '-'}
+- Channel Used: ${parsed.structured_statement?.summary?.channel_used || '-'}
+- Suspected Scam Pattern: ${parsed.structured_statement?.summary?.suspected_scam_pattern || '-'}
+- Attachments Provided: ${parsed.structured_statement?.summary?.attachments_provided || (attachments && attachments.length > 0 ? 'Yes' : 'No')}
+
+Victim Statement
+${parsed.structured_statement?.victim_statement || '-'}
+
+Attachments
+${attList}`;
+  } catch (error) {
+    console.error("Statement Restructuring Failed:", error);
+    return rawDescription; // Fallback to original description if it fails
+  }
 }
 
 export function normalizeAnalysis(raw: any): GLMAnalysis {

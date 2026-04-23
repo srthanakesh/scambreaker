@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { analyzeCase } from '@/services/glm';
+import { analyzeCase, restructureStatement } from '@/services/glm';
 import { getCurrentUser } from '@/lib/auth';
 import {
   detectManualReviewSignals,
@@ -21,23 +21,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { rawDescription, analysisJson, uploadedFiles } = await request.json();
+    let { rawDescription, analysisJson, uploadedFiles } = await request.json();
 
     if (!rawDescription) {
       return NextResponse.json({ error: 'Description is required' }, { status: 400 });
     }
 
-    // 1. Run GLM analysis if not provided
+    // Fetch victim user details for the prompt
+    const victimDetails = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { fullName: true, email: true, phoneNumber: true, icNumber: true }
+    });
+
+    // 1. Restructure the statement
+    const attachmentMeta = Array.isArray(uploadedFiles) && uploadedFiles.length > 0
+      ? uploadedFiles.map((f: any) => ({ file_name: f.name || 'attachment', file_type: f.type || 'unknown' }))
+      : undefined;
+    const structuredStatement = await restructureStatement(rawDescription, victimDetails || {}, attachmentMeta);
+    rawDescription = structuredStatement;
+
+    // 2. Run GLM analysis if not provided
     const analysis = analysisJson || await analyzeCase(rawDescription);
 
     // Calculate Recoverability
+    const evidenceCount = Array.isArray(uploadedFiles) ? uploadedFiles.length : 0;
     const recoverability = calculateRecoverability({
       rawDescription,
       scamType: analysis.scamType,
       amountLost: analysis.amountLost,
+      createdAt: new Date(),
+      evidenceCount,
     });
 
-    // 2. Create the case with analysis payload
+    // 3. Create the case with analysis payload
     const newCase = await prisma.case.create({
       data: ({
         userId: session.userId,
@@ -56,7 +72,13 @@ export async function POST(request: Request) {
         recoverabilityScore: recoverability.score,
         recoverabilityLevel: recoverability.level,
         timeToActMinutes: recoverability.timeWindowMinutes,
-        priorityReason: recoverability.reasons,
+        priorityReason: recoverability.reasons.filter(r =>
+          !r.toLowerCase().includes('ago') &&
+          !r.toLowerCase().includes('occurred') &&
+          !r.toLowerCase().includes('recently') &&
+          !r.toLowerCase().includes('yesterday') &&
+          !r.toLowerCase().includes('recency')
+        ),
         // Create authority ticket
         ticket: {
           create: {

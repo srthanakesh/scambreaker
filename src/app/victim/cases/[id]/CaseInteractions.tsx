@@ -1,8 +1,18 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { updateTaskStatus, submitMissingInfo, submitEvidence } from '@/app/actions/victim';
+import { updateTaskStatus, submitMissingInfo } from '@/app/actions/victim';
 import { Check, Phone } from 'lucide-react';
+
+function formatDateSafe(dateStr: string) {
+  const d = new Date(dateStr);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year}, ${h}:${m}`;
+}
 
 const ACTION_STEPS = [
   { id: 'bank', title: "1. Call Your Bank's Fraud Hotline", priority: 'IMMEDIATE', priorityColor: 'bg-red-100 text-red-700', desc: "Call your bank's fraud hotline immediately to freeze your account." },
@@ -15,6 +25,7 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
   const [missingInfoText, setMissingInfoText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
 
@@ -104,13 +115,19 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
 
       if (selectedFile) {
         const fileUrl = await fileToBase64(selectedFile);
-        await submitEvidence(caseRecord.id, fileUrl);
+        const res = await fetch(`/api/cases/${caseRecord.id}/evidence`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileUrl }),
+        });
+        if (!res.ok) {
+          throw new Error('Failed to upload evidence');
+        }
       }
 
       setMissingInfoText('');
       setSelectedFile(null);
-      alert('Information submitted successfully!');
-      window.location.reload();
+      setSubmitted(true);
     } catch {
       alert('Failed to submit information');
     } finally {
@@ -229,7 +246,7 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
                     className="bg-blue-50 p-3 rounded-md text-sm text-blue-900 border border-blue-200"
                   >
                     <div className="font-semibold mb-1 text-xs text-blue-700">
-                      Authority • {new Date(msg.createdAt).toLocaleString()}
+                      Authority • {formatDateSafe(msg.createdAt)}
                     </div>
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                   </div>
@@ -249,7 +266,7 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
                     className="bg-slate-50 p-3 rounded-md text-sm text-slate-700 border border-slate-200"
                   >
                     <div className="font-semibold mb-1 text-xs text-slate-500">
-                      You • {new Date(msg.createdAt).toISOString().replace('T', ' ').slice(0, 19)}
+                      You • {formatDateSafe(msg.createdAt)}
                     </div>
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                   </div>
@@ -257,6 +274,11 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
               </div>
             )}
 
+              {submitted ? (
+                <div className="bg-green-50 border border-green-200 rounded-md p-4 text-sm text-green-800 font-medium">
+                  Information submitted successfully. The authority will review your response.
+                </div>
+              ) : (
               <div className="space-y-4">
                 <div>
                   <label
@@ -267,7 +289,7 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
                   </label>
                   <p className="text-xs text-slate-500 mb-2">
                     You can paste the missing information below and optionally upload
-                    a supporting file for demo purposes.
+                    a supporting file.
                   </p>
                   <textarea
                     id="missingInfo"
@@ -307,6 +329,7 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
                   {isSubmitting ? 'Submitting...' : 'Submit Information'}
                 </button>
               </div>
+              )}
           </div>
         </div>
       )}

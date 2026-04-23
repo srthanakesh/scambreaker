@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { getDynamicRecoverability, scoreToLevel } from '@/lib/recoverability-engine';
 
-function getAgingColor(createdAt: string, recoverabilityLevel: string | null, workflowStatus: string) {
+function getAgingColor(createdAt: string, dynamicLevel: string | null, workflowStatus: string, timeToActMinutes: number | null, now: number) {
   if (workflowStatus === 'CLOSED' || workflowStatus === 'RESOLVED') return '';
-  
-  const slaMins = recoverabilityLevel === 'CRITICAL' ? 15 : recoverabilityLevel === 'HIGH' ? 60 : 360;
-  const elapsedMins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+
+  const slaMins = timeToActMinutes || (dynamicLevel === 'CRITICAL' ? 15 : dynamicLevel === 'HIGH' ? 60 : 360);
+  const elapsedMins = Math.max(0, Math.floor((now - new Date(createdAt).getTime()) / 60000));
   const ratio = elapsedMins / slaMins;
 
   if (ratio >= 1) return 'bg-red-50 border-l-4 border-l-red-500'; // Breached
@@ -21,6 +22,7 @@ function detectDuplicates(cases: any[]) {
   
   cases.forEach(c => {
     // Group by similar amount + scam type within 24h
+    if (c.workflowStatus === 'CLOSED' || c.workflowStatus === 'RESOLVED') return;
     const key = `${c.scamType || 'unknown'}_${Math.round(c.amountLost || 0)}`;
     if (!dupMap.has(key)) dupMap.set(key, []);
     dupMap.get(key)!.push(c.id);
@@ -37,30 +39,51 @@ export default function DashboardPage() {
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    fetch('/api/cases')
-      .then(res => res.json())
-      .then(data => {
-        setCases(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+    const fetchData = () => {
+      fetch('/api/cases')
+        .then(res => res.json())
+        .then(data => {
+          setCases(Array.isArray(data) ? data : []);
+          setLoading(false);
+          setNow(Date.now());
+        })
+        .catch(err => {
+          console.error(err);
+          setLoading(false);
+        });
+    };
+
+    fetchData();
+
+    // Poll every 30 seconds to ensure real-time sync for SLAs, Breaches, Duplicates, etc.
+    const interval = setInterval(() => {
+      fetchData();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div className="text-center py-20">Loading dashboard...</div>;
+  if (loading && cases.length === 0) return <div className="text-center py-20">Loading dashboard...</div>;
 
-  const filteredCases = (filterStatus === 'All' 
-    ? cases 
-    : cases.filter(c => c.workflowStatus === filterStatus)
+  // Compute real-time recoverability for all active cases
+  const casesWithDynamic = cases.map(c => {
+    if (c.workflowStatus === 'CLOSED' || c.workflowStatus === 'RESOLVED') {
+      return { ...c, dynamicScore: c.recoverabilityScore ?? 0, dynamicLevel: c.recoverabilityLevel ?? 'LOW' };
+    }
+    const dynamic = getDynamicRecoverability(c.recoverabilityScore ?? 0, c.createdAt);
+    return { ...c, dynamicScore: dynamic.currentScore, dynamicLevel: dynamic.currentLevel };
+  });
+
+  const filteredCases = (filterStatus === 'All'
+    ? casesWithDynamic
+    : casesWithDynamic.filter(c => c.workflowStatus === filterStatus)
   ).sort((a, b) => {
-    // CRITICAL cases always pinned to top
     const levelOrder: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-    const aLevel = levelOrder[a.recoverabilityLevel] ?? 4;
-    const bLevel = levelOrder[b.recoverabilityLevel] ?? 4;
+    const aLevel = levelOrder[a.dynamicLevel] ?? 4;
+    const bLevel = levelOrder[b.dynamicLevel] ?? 4;
     if (aLevel !== bLevel) return aLevel - bLevel;
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
@@ -71,13 +94,13 @@ export default function DashboardPage() {
   const resolved = cases.filter(c => c.interventionOutcome);
   const recovered = resolved.filter(c => c.interventionOutcome === 'RECOVERED');
   const partial = resolved.filter(c => c.interventionOutcome === 'PARTIAL');
-  const breachedCount = cases.filter(c => {
+  const breachedCount = casesWithDynamic.filter(c => {
     if (c.workflowStatus === 'CLOSED' || c.workflowStatus === 'RESOLVED') return false;
-    const slaMins = c.recoverabilityLevel === 'CRITICAL' ? 15 : c.recoverabilityLevel === 'HIGH' ? 60 : 360;
-    const elapsed = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 60000);
+    const slaMins = c.timeToActMinutes || (c.dynamicLevel === 'CRITICAL' ? 15 : c.dynamicLevel === 'HIGH' ? 60 : 360);
+    const elapsed = Math.floor((now - new Date(c.createdAt).getTime()) / 60000);
     return elapsed > slaMins;
   }).length;
-  const totalActive = cases.filter(c => c.workflowStatus !== 'CLOSED' && c.workflowStatus !== 'RESOLVED').length;
+  const totalActive = casesWithDynamic.filter(c => c.workflowStatus !== 'CLOSED' && c.workflowStatus !== 'RESOLVED').length;
   const slaCompliance = totalActive > 0 ? (((totalActive - breachedCount) / totalActive) * 100).toFixed(1) : '100.0';
 
   return (
@@ -124,7 +147,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-8 flex flex-wrap gap-2">
-        {['All', 'INTAKE', 'TRIAGED', 'ACTION_REQUIRED', 'IN_PROGRESS', 'AWAITING_EXTERNAL', 'RESOLVED', 'CLOSED'].map(status => (
+        {['All', 'TRIAGED', 'ROUTED', 'IN_PROGRESS', 'NEEDS_INFO', 'RESOLVED', 'CLOSED'].map(status => (
           <button
             key={status}
             onClick={() => setFilterStatus(status)}
@@ -134,7 +157,7 @@ export default function DashboardPage() {
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            {status}
+            {status === 'All' ? 'All' : status.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -148,7 +171,6 @@ export default function DashboardPage() {
                   <tr>
                     <th className="px-3 py-3.5 text-left text-sm font-bold text-gray-900">Case ID</th>
                     <th className="px-3 py-3.5 text-left text-sm font-bold text-gray-900">Type</th>
-                    <th className="px-3 py-3.5 text-left text-sm font-bold text-gray-900">Agency</th>
                     <th className="px-3 py-3.5 text-left text-sm font-bold text-gray-900">Recoverability Score</th>
                     <th className="px-3 py-3.5 text-left text-sm font-bold text-gray-900">SLA</th>
                     <th className="px-3 py-3.5 text-left text-sm font-bold text-gray-900">Status</th>
@@ -167,7 +189,7 @@ export default function DashboardPage() {
                     </tr>
                   ) : (
                     filteredCases.map((c) => (
-                      <tr key={c.id} className={`transition-colors ${getAgingColor(c.createdAt, c.recoverabilityLevel, c.workflowStatus)}`}>
+                      <tr key={c.id} className={`transition-colors ${getAgingColor(c.createdAt, c.dynamicLevel, c.workflowStatus, c.timeToActMinutes, now)}`}>
                         <td className="whitespace-nowrap px-3 py-4 text-sm font-mono text-gray-500">
                           <div>{c.id.substring(0, 8)}...</div>
                           {c.requiresManualReview && (
@@ -188,16 +210,14 @@ export default function DashboardPage() {
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
                           {c.scamType || 'Pending Analysis'}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
-                          {c.assignedAgency || 'Unassigned'}
-                        </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm">
                           {(() => {
-                            const score = c.recoverabilityScore ?? 0;
-                            const level = c.recoverabilityLevel || 'MEDIUM';
+                            const score = c.dynamicScore ?? 0;
+                            const level = c.dynamicLevel || 'MEDIUM';
                             const badgeClass = level === 'CRITICAL' ? 'bg-red-100 text-red-700 ring-red-600/20'
                               : level === 'HIGH' ? 'bg-orange-100 text-orange-700 ring-orange-600/20'
-                              : 'bg-yellow-100 text-yellow-700 ring-yellow-600/20';
+                              : level === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 ring-yellow-600/20'
+                              : 'bg-gray-100 text-gray-600 ring-gray-500/20';
                             return (
                               <span className="inline-flex items-center gap-2">
                                 <span className="font-black text-slate-900">{score}<span className="text-slate-400 font-medium">/100</span></span>
@@ -210,8 +230,8 @@ export default function DashboardPage() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm">
                           {(() => {
-                            const slaMins = c.recoverabilityLevel === 'CRITICAL' ? 15 : c.recoverabilityLevel === 'HIGH' ? 60 : 360;
-                            const elapsedMins = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 60000);
+                            const slaMins = c.timeToActMinutes || (c.dynamicLevel === 'CRITICAL' ? 15 : c.dynamicLevel === 'HIGH' ? 60 : 360);
+                            const elapsedMins = Math.max(0, Math.floor((now - new Date(c.createdAt).getTime()) / 60000));
                             const timeLeft = slaMins - elapsedMins;
                             
                             if (c.workflowStatus === 'CLOSED' || c.workflowStatus === 'RESOLVED') {
@@ -237,14 +257,15 @@ export default function DashboardPage() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm">
                           <span className={`px-2 py-1 rounded text-xs font-bold ${
-                            c.workflowStatus === 'ACTION_REQUIRED' ? 'bg-red-600 text-white animate-pulse' :
+                            c.workflowStatus === 'NEEDS_INFO' ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-400' :
                             c.workflowStatus === 'TRIAGED' ? 'bg-blue-100 text-blue-800' :
-                            c.workflowStatus === 'IN_PROGRESS' ? 'bg-indigo-100 text-indigo-800' :
+                            c.workflowStatus === 'ROUTED' ? 'bg-indigo-100 text-indigo-800' :
+                            c.workflowStatus === 'IN_PROGRESS' ? 'bg-purple-100 text-purple-800' :
                             c.workflowStatus === 'RESOLVED' ? 'bg-green-100 text-green-800' :
                             c.workflowStatus === 'CLOSED' ? 'bg-gray-200 text-gray-600' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {c.workflowStatus}
+                            {c.workflowStatus.replace(/_/g, ' ')}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm">

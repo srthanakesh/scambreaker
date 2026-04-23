@@ -31,12 +31,15 @@ export async function submitMissingInfo(caseId: string, content: string) {
     },
   });
 
-  await prisma.case.update({
-    where: { id: caseId },
-    data: {
-      workflowStatus: 'ROUTED',
-    },
-  });
+  // Only move to ROUTED if currently in NEEDS_INFO
+  if (caseRecord.workflowStatus === 'NEEDS_INFO') {
+    await prisma.case.update({
+      where: { id: caseId },
+      data: {
+        workflowStatus: 'ROUTED',
+      },
+    });
+  }
 
   return { success: true };
 }
