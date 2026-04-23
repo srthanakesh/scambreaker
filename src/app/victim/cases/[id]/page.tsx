@@ -4,7 +4,16 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import CaseInteractions from './CaseInteractions';
-import EditableDrafts from './EditableDrafts';
+import EditableDrafts, { DraftDoc } from './EditableDrafts';
+
+function formatDate(d: Date) {
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year}, ${h}:${m}`;
+}
 
 export default async function VictimCaseDetail({
   params,
@@ -36,7 +45,7 @@ export default async function VictimCaseDetail({
     notFound();
   }
 
-  const documents = Array.isArray(caseRecord.documents) ? caseRecord.documents : [];
+  const documents = (Array.isArray(caseRecord.documents) ? caseRecord.documents : []) as DraftDoc[];
 
   return (
     <>
@@ -57,7 +66,7 @@ export default async function VictimCaseDetail({
               Case Reference: {caseRecord.id}
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              Reported on {new Date(caseRecord.createdAt).toLocaleString()}
+              Reported on {formatDate(new Date(caseRecord.createdAt))}
             </p>
           </div>
 

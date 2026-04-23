@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 
-type DraftDoc = {
+export type DraftDoc = {
   title?: string;
   type?: string;
   content?: string;

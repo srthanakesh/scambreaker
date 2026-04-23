@@ -29,7 +29,7 @@ export default function WorkflowPage() {
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6 text-gray-900">
       <div className="flex items-center gap-4 mb-6">
         <Link href={`/authority/dashboard/cases/${id}`} className="text-blue-600 font-bold">&larr; Back to Case</Link>
-        <h1 className="text-2xl font-bold">Official Workflow: {caseData.assignedAgency}</h1>
+        <h1 className="text-2xl font-bold">Official Workflow: {caseData.assignedAgency || 'Unassigned'}</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

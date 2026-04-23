@@ -64,6 +64,11 @@ When the user sends a message:
    - Transfer method (bank transfer, DuitNow, crypto, etc.)
    - Time of transfer (convert to minutes elapsed if possible)
    - Bank involved (victim bank + mule/receiving bank if mentioned)
+     IMPORTANT: Normalize bank names to official names. Common aliases:
+     m2u/mae/Maybank2u → Maybank | octo/CIMB Clicks → CIMB | pbb/PB Engage → Public Bank
+     rhb now → RHB | hlb/HLB Connect → Hong Leong | amonline → AmBank
+     pbe → Public Bank | gxbank → GX Bank | boost → Boost Bank
+     When in doubt, use the most common official short name.
    - Platform/channel (WhatsApp, phone call, Telegram, website, etc.)
    - Any identifiers (account number, phone number, URL, name)
 
