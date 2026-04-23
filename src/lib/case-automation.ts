@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { detectManualReviewSignals } from '@/lib/authority-workflow';
 import { logWorkflowEvent, WorkflowActorType } from '@/lib/workflow-log';
+import { generateFormalDocuments } from '@/services/glm';
 
 type DraftDoc = {
   type: string;
@@ -151,6 +152,7 @@ export async function generateDraftsForCase(input: {
   existingDocuments?: unknown;
   actorType?: WorkflowActorType;
   actorId?: string;
+  victimInfo?: { fullName?: string; icNumber?: string; phoneNumber?: string; email?: string };
 }) {
   const missingInfo = toArray(input.missingInfo);
   const now = new Date().toISOString();
@@ -160,6 +162,9 @@ export async function generateDraftsForCase(input: {
     summary: input.summary,
     assignedAgency: input.assignedAgency,
   });
+
+  // Call GLM to generate the professional drafts
+  const formalDocs = await generateFormalDocuments(input.caseId, input.rawDescription, input.summary ?? '', input.victimInfo);
 
   const nextDrafts: DraftDoc[] = [];
   nextDrafts.push({
@@ -183,13 +188,13 @@ export async function generateDraftsForCase(input: {
   nextDrafts.push({
     type: 'bank_dispute_draft',
     title: 'Bank Dispute Draft',
-    content: `Subject: Dispute Request for Suspected Scam Transaction\nCase Reference: ${input.caseId}\nClaimed amount: RM ${input.amountLost ?? 0}\nIncident summary: ${input.summary ?? input.rawDescription.slice(0, 240)}`,
+    content: formalDocs?.bank_dispute_draft || `Subject: Dispute Request for Suspected Scam Transaction\nCase Reference: ${input.caseId}\nClaimed amount: RM ${input.amountLost ?? 0}\nIncident summary: ${input.summary ?? input.rawDescription.slice(0, 240)}`,
     generatedAt: now,
   });
   nextDrafts.push({
     type: 'police_report_draft',
     title: 'Police Report Draft',
-    content: `Police Report Draft\nCase: ${input.caseId}\nType: ${input.scamType ?? 'UNKNOWN'}\nStatement:\n${input.rawDescription}`,
+    content: formalDocs?.police_report_draft || `Police Report Draft\nCase: ${input.caseId}\nType: ${input.scamType ?? 'UNKNOWN'}\nStatement:\n${input.rawDescription}`,
     generatedAt: now,
   });
 

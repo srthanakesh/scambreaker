@@ -20,14 +20,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { rawDescription } = await request.json();
+    const { rawDescription, analysisJson, uploadedFiles } = await request.json();
 
     if (!rawDescription) {
       return NextResponse.json({ error: 'Description is required' }, { status: 400 });
     }
 
-    // 1. Run Real GLM analysis
-    const analysis = await analyzeCase(rawDescription);
+    // 1. Run GLM analysis if not provided
+    const analysis = analysisJson || await analyzeCase(rawDescription);
 
     // 2. Create the case with analysis payload
     const newCase = await prisma.case.create({
@@ -86,6 +86,17 @@ export async function POST(request: Request) {
       });
     }
 
+    // Fetch victim info for draft generation
+    const victim = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: {
+        fullName: true,
+        icNumber: true,
+        phoneNumber: true,
+        email: true,
+      }
+    });
+
     await generateFollowUpTasksForCase({
       caseId: newCase.id,
       workflowStatus: newCase.workflowStatus,
@@ -94,6 +105,7 @@ export async function POST(request: Request) {
       missingInfo: newCase.missingInfo,
       actorType: 'SYSTEM',
     });
+
     await generateDraftsForCase({
       caseId: newCase.id,
       rawDescription: newCase.rawDescription,
@@ -106,7 +118,34 @@ export async function POST(request: Request) {
       amountLost: newCase.amountLost,
       existingDocuments: newCase.documents,
       actorType: 'SYSTEM',
+      victimInfo: victim ? {
+        fullName: victim.fullName || undefined,
+        icNumber: victim.icNumber || undefined,
+        phoneNumber: victim.phoneNumber || undefined,
+        email: victim.email || undefined,
+      } : undefined,
     });
+
+    // Store uploaded evidence files
+    if (uploadedFiles && Array.isArray(uploadedFiles)) {
+      for (const file of uploadedFiles) {
+        if (file.dataUrl) {
+          await prisma.evidence.create({
+            data: {
+              caseId: newCase.id,
+              fileUrl: file.dataUrl,
+            },
+          });
+          await logWorkflowEvent({
+            caseId: newCase.id,
+            eventType: 'EVIDENCE_UPLOADED',
+            message: `Evidence file uploaded: ${file.name || 'attachment'}`,
+            actorType: 'VICTIM',
+            actorId: session.userId,
+          });
+        }
+      }
+    }
 
     return NextResponse.json(newCase);
   } catch (error) {

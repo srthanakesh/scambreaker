@@ -42,7 +42,11 @@ export default async function VictimDashboard() {
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-blue-600 truncate">{c.scamType || 'Unknown Scam'}</p>
                         <div className="ml-2 flex-shrink-0 flex">
-                          <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            c.workflowStatus === 'NEEDS_INFO' || c.workflowStatus === 'FOLLOW_UP_PENDING'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
                             {c.workflowStatus}
                           </p>
                         </div>

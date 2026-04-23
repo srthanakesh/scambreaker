@@ -31,15 +31,8 @@ export default function ChangePasswordForm() {
           </div>
         )}
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Current Password</label>
-          <input 
-            type="password" 
-            name="currentPassword" 
-            required
-            className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-          />
-        </div>
+
+
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
