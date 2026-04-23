@@ -12,6 +12,7 @@ import {
   generateFollowUpTasksForCase,
 } from '@/lib/case-automation';
 import { logWorkflowEvent } from '@/lib/workflow-log';
+import { calculateRecoverability } from '@/lib/recoverability-engine';
 
 export async function POST(request: Request) {
   try {
@@ -29,9 +30,16 @@ export async function POST(request: Request) {
     // 1. Run GLM analysis if not provided
     const analysis = analysisJson || await analyzeCase(rawDescription);
 
+    // Calculate Recoverability
+    const recoverability = calculateRecoverability({
+      rawDescription,
+      scamType: analysis.scamType,
+      amountLost: analysis.amountLost,
+    });
+
     // 2. Create the case with analysis payload
     const newCase = await prisma.case.create({
-      data: {
+      data: ({
         userId: session.userId,
         rawDescription,
         detectedLanguage: analysis.detectedLanguage,
@@ -44,7 +52,11 @@ export async function POST(request: Request) {
         suggestedRouting: analysis.suggestedRouting,
         assignedAgency: analysis.assignedAgency,
         priority: analysis.priority,
-        workflowStatus: analysis.workflowStatus,
+        workflowStatus: recoverability.level === 'CRITICAL' ? 'ACTION_REQUIRED' : 'TRIAGED',
+        recoverabilityScore: recoverability.score,
+        recoverabilityLevel: recoverability.level,
+        timeToActMinutes: recoverability.timeWindowMinutes,
+        priorityReason: recoverability.reasons,
         // Create authority ticket
         ticket: {
           create: {
@@ -53,7 +65,7 @@ export async function POST(request: Request) {
             status: 'OPEN',
           }
         }
-      },
+      } as any),
     });
 
     await logWorkflowEvent({
@@ -162,7 +174,7 @@ export async function GET() {
     }
 
     if (session.role === 'AUTHORITY') {
-      const authorityCases = await prisma.case.findMany({
+      const authorityCases = await (prisma.case.findMany as any)({
         select: {
           id: true,
           scamType: true,
@@ -172,11 +184,14 @@ export async function GET() {
           assignedAgency: true,
           summary: true,
           createdAt: true,
+          recoverabilityScore: true,
+          recoverabilityLevel: true,
+          timeToActMinutes: true,
         },
       });
 
       const sorted = authorityCases
-        .map((caseItem) => ({
+        .map((caseItem: any) => ({
           ...caseItem,
           ...detectManualReviewSignals({
             scamType: caseItem.scamType,
@@ -184,7 +199,7 @@ export async function GET() {
             assignedAgency: caseItem.assignedAgency,
           }),
         }))
-        .sort((a, b) => {
+        .sort((a: any, b: any) => {
           const urgencyDiff = urgencyWeight(b.urgency) - urgencyWeight(a.urgency);
           if (urgencyDiff !== 0) return urgencyDiff;
 

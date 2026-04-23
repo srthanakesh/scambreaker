@@ -36,6 +36,13 @@ model Case {
   authorityNotes   String?          @default("")
   documents        Json?
   workflowStatus   String           @default("NEW")
+  recoverabilityScore Int?
+  recoverabilityLevel String?
+  timeToActMinutes    Int?
+  priorityReason      Json?
+  interventionOutcome String?
+  interventionAction  String?
+  interventionTimeMins Int?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   userId           String

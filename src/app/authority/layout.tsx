@@ -25,7 +25,9 @@ export default async function AuthorityLayout({ children }: { children: React.Re
               </Link>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-slate-600 font-medium">Badge: {session.email}</span>
+              <span className="bg-slate-800 text-slate-200 border border-slate-600 rounded-md px-3 py-1 font-semibold text-sm">
+                [ NSRC Operations Hub ] - ID: 402
+              </span>
               <form action={logout}>
                 <button type="submit" className="text-slate-500 hover:text-red-600 flex items-center text-sm font-medium">
                   <LogOut className="h-4 w-4 mr-1" />

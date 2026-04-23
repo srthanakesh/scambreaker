@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import CaseInteractions from './CaseInteractions';
-import EditableDrafts from './EditableDrafts';
+import EditableDrafts, { DraftDoc } from './EditableDrafts';
 
 export default async function VictimCaseDetail({
   params,
@@ -36,7 +36,7 @@ export default async function VictimCaseDetail({
     notFound();
   }
 
-  const documents = Array.isArray(caseRecord.documents) ? caseRecord.documents : [];
+  const documents = (Array.isArray(caseRecord.documents) ? caseRecord.documents : []) as DraftDoc[];
 
   return (
     <>
