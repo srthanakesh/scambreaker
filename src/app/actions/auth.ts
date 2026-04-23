@@ -135,11 +135,10 @@ export async function logout() {
 }
 
 export async function updatePassword(prevState: any, formData: FormData) {
-  const currentPassword = formData.get('currentPassword') as string;
   const newPassword = formData.get('newPassword') as string;
   const confirmPassword = formData.get('confirmPassword') as string;
 
-  if (!currentPassword || !newPassword || !confirmPassword) {
+  if (!newPassword || !confirmPassword) {
     return { error: 'All fields are required.' };
   }
 
@@ -154,15 +153,10 @@ export async function updatePassword(prevState: any, formData: FormData) {
   const session = await getCurrentUser();
   if (!session) return { error: 'Unauthorized.' };
 
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
-  if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
-    return { error: 'Current password is incorrect.' };
-  }
-
   const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
   await prisma.user.update({
-    where: { id: user.id },
+    where: { id: session.userId },
     data: { password: newPasswordHash },
   });
 

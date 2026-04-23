@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import CaseInteractions from './CaseInteractions';
+import EditableDrafts from './EditableDrafts';
 
 export default async function VictimCaseDetail({
   params,
@@ -95,64 +96,24 @@ export default async function VictimCaseDetail({
           </div>
 
           <div className="sm:col-span-2">
-            <p className="text-sm text-slate-500">Description</p>
-            <p className="whitespace-pre-wrap text-slate-900">
-              {caseRecord.rawDescription}
+            <p className="text-sm text-slate-500">Incident Summary (AI Extracted)</p>
+            <p className="text-slate-900 whitespace-pre-wrap leading-relaxed mt-1">
+              {caseRecord.summary || 'Pending analysis...'}
             </p>
           </div>
 
-          {caseRecord.summary && (
-            <div className="sm:col-span-2">
-              <p className="text-sm text-slate-500">Case Summary</p>
-              <p className="text-slate-900 whitespace-pre-wrap">
-                {caseRecord.summary}
-              </p>
-            </div>
-          )}
 
-          {caseRecord.suggestedStep && (
-            <div className="sm:col-span-2 bg-yellow-50 p-4 rounded-md border border-yellow-200">
-              <p className="text-sm font-medium text-yellow-800">Suggested Next Step</p>
-              <p className="mt-1 text-sm text-yellow-900">{caseRecord.suggestedStep}</p>
-            </div>
-          )}
 
-          {caseRecord.suggestedRouting && (
-            <div className="sm:col-span-2 bg-indigo-50 p-4 rounded-md border border-indigo-200">
-              <p className="text-sm font-medium text-indigo-800">Suggested Routing</p>
-              <p className="mt-1 text-sm text-indigo-900 whitespace-pre-wrap">
-                {caseRecord.suggestedRouting}
-              </p>
-            </div>
-          )}
+
+
         </div>
       </div>
-
-      {documents.length > 0 && (
-        <div className="mt-8 bg-white shadow rounded-lg border border-slate-200 p-4">
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">
-            Generated Document Drafts
-          </h3>
-          <p className="text-sm text-slate-600 mb-4">
-            Read-only drafts generated for your case.
-          </p>
-
-          {documents.map((doc: any, i: number) => (
-            <details key={i} className="border border-slate-200 p-3 rounded mb-2">
-              <summary className="cursor-pointer font-medium text-slate-900">
-                {doc.title || `Draft ${i + 1}`}
-              </summary>
-              <p className="mt-2 whitespace-pre-wrap text-slate-800">
-                {doc.content}
-              </p>
-            </details>
-          ))}
-        </div>
-      )}
 
       <div className="mt-8">
         <CaseInteractions caseRecord={caseRecord} />
       </div>
+
+      <EditableDrafts documents={documents} />
 
       {caseRecord.evidence.length > 0 && (
         <div className="mt-8 bg-white shadow rounded-lg border border-slate-200 p-4">

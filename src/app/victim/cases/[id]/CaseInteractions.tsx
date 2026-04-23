@@ -1,14 +1,64 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { updateTaskStatus, submitMissingInfo, submitEvidence } from '@/app/actions/victim';
-import { CheckCircle } from 'lucide-react';
+import { Check, Phone } from 'lucide-react';
+
+const ACTION_STEPS = [
+  { id: 'bank', title: "1. Call Your Bank's Fraud Hotline", priority: 'IMMEDIATE', priorityColor: 'bg-red-100 text-red-700', desc: "Call your bank's fraud hotline immediately to freeze your account." },
+  { id: 'nsrc', title: "2. Call NSRC (997)", priority: 'IMMEDIATE', priorityColor: 'bg-red-100 text-red-700', desc: "Report to the National Scam Response Centre. They can coordinate with multiple banks." },
+  { id: 'evidence', title: "3. Preserve All Evidence", priority: 'URGENT', priorityColor: 'bg-orange-100 text-orange-700', desc: "Screenshot every message, transaction receipt, and the scammer's profile before they disappear." },
+  { id: 'police', title: "4. File Police Report", priority: 'WITHIN 24 HOURS', priorityColor: 'bg-slate-100 text-slate-800', desc: "Bring your IC, bank statements, and screenshots to the nearest police station." }
+];
 
 export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
   const [missingInfoText, setMissingInfoText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
+
+  // Load saved completed steps from DB
+  useEffect(() => {
+    fetch(`/api/cases/${caseRecord.id}/steps`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.completedSteps) setCheckedSteps(data.completedSteps);
+      })
+      .catch(() => {});
+  }, [caseRecord.id]);
+
+  const toggleStep = (id: string) => {
+    const updated = { ...checkedSteps, [id]: !checkedSteps[id] };
+    setCheckedSteps(updated);
+    // Persist to DB
+    fetch(`/api/cases/${caseRecord.id}/steps`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completedSteps: updated }),
+    }).catch(() => {});
+  };
+
+  const { bankNumber, isNsrcOnly } = useMemo(() => {
+    const text = ((caseRecord.summary || '') + ' ' + (caseRecord.rawDescription || '')).toLowerCase();
+    if (text.includes('maybank')) return { bankNumber: '1-300-88-6688', isNsrcOnly: false };
+    if (text.includes('cimb')) return { bankNumber: '1300-880-900', isNsrcOnly: false };
+    if (text.includes('public bank') || text.includes('pbb')) return { bankNumber: '1-800-22-5555', isNsrcOnly: false };
+    if (text.includes('rhb')) return { bankNumber: '1-800-88-9878', isNsrcOnly: false };
+    if (text.includes('hong leong') || text.includes('hlb')) return { bankNumber: '1-300-88-1234', isNsrcOnly: false };
+    return { bankNumber: '997', isNsrcOnly: true };
+  }, [caseRecord.summary, caseRecord.rawDescription]);
+
+  // Dynamic suggested next step based on remaining steps
+  const remainingSteps = useMemo(() => ACTION_STEPS.filter(s => !checkedSteps[s.id]), [checkedSteps]);
+  const dynamicNextStep = useMemo(() => {
+    if (remainingSteps.length === 0) return 'All action steps completed. Await authority follow-up.';
+    return remainingSteps[0].desc;
+  }, [remainingSteps]);
+  const dynamicRouting = useMemo(() => {
+    if (remainingSteps.length === 0) return 'All steps completed — case is fully submitted.';
+    return remainingSteps.map((s, i) => `${i + 1}. ${s.title.replace(/^\d+\.\s*/, '')}`).join(' → ');
+  }, [remainingSteps]);
 
   const missingInfoItems = Array.isArray(caseRecord.missingInfo)
     ? caseRecord.missingInfo
@@ -70,58 +120,77 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
 
   return (
     <div className="space-y-8">
-      {caseRecord.followUpTasks.length > 0 && (
-        <div className="bg-white shadow sm:rounded-lg border border-slate-200 overflow-hidden">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg leading-6 font-medium text-slate-900">Action Items</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Please complete these steps to help with the investigation.
-            </p>
-          </div>
-
-          <div className="border-t border-slate-200">
-            <ul className="divide-y divide-slate-200">
-              {caseRecord.followUpTasks.map((task: any) => (
-                <li key={task.id} className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-slate-900">{task.title}</p>
-
-                    <div className="flex items-center space-x-3">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          task.status === 'COMPLETED'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-slate-100 text-slate-800'
-                        }`}
-                      >
-                        {task.status}
-                      </span>
-
-                      {task.status === 'PENDING' && (
-                        <button
-                          onClick={() => handleCompleteTask(task.id)}
-                          disabled={updatingTask === task.id || caseRecord.workflowStatus === 'NEEDS_INFO'}
-                          title={
-                            caseRecord.workflowStatus === 'NEEDS_INFO'
-                              ? 'Please submit the requested information first'
-                              : ''
-                          }
-                          className="flex items-center text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+      <div className="bg-white shadow sm:rounded-lg border border-slate-200 overflow-hidden">
+        <div className="px-4 py-5 sm:px-6">
+          <h3 className="text-lg leading-6 font-medium text-slate-900">Your Action Plan</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Please complete these steps immediately to help with the investigation.
+          </p>
+        </div>
+        <div className="border-t border-slate-200">
+          <ul className="divide-y divide-slate-200">
+            {ACTION_STEPS.map(step => (
+              <li 
+                key={step.id} 
+                className={`px-4 py-4 sm:px-6 cursor-pointer transition-colors hover:bg-slate-50 ${checkedSteps[step.id] ? 'bg-slate-50/50' : ''}`}
+                onClick={() => toggleStep(step.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-5 h-5 flex-shrink-0 border rounded flex items-center justify-center transition-colors ${checkedSteps[step.id] ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
+                      {checkedSteps[step.id] && <Check className="w-3.5 h-3.5 text-white" />}
+                    </div>
+                    <p className={`text-sm font-medium ${checkedSteps[step.id] ? 'text-slate-500 line-through' : 'text-slate-900'}`}>{step.title}</p>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${step.priorityColor} ${checkedSteps[step.id] ? 'opacity-50' : ''}`}>
+                    {step.priority}
+                  </span>
+                </div>
+                <div className="mt-1 pl-8">
+                  <p className={`text-sm ${checkedSteps[step.id] ? 'text-slate-400' : 'text-slate-500'}`}>{step.desc}</p>
+                  
+                  {!checkedSteps[step.id] && (
+                    <div className="mt-3">
+                      {step.id === 'bank' && (
+                        <a 
+                          href={`tel:${bankNumber}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-500 hover:bg-teal-600 text-white shadow-sm transition-colors"
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          {updatingTask === task.id ? 'Updating...' : 'Mark Done'}
-                        </button>
+                          <Phone className="w-3.5 h-3.5 mr-1.5" />
+                          Call Now
+                        </a>
+                      )}
+                      {step.id === 'nsrc' && (
+                        <a 
+                          href="tel:997"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-500 hover:bg-teal-600 text-white shadow-sm transition-colors"
+                        >
+                          <Phone className="w-3.5 h-3.5 mr-1.5" />
+                          Call 997
+                        </a>
                       )}
                     </div>
-                  </div>
-
-                  <p className="mt-2 text-sm text-slate-500">{task.description}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-      )}
+      </div>
+
+      {/* Dynamic Suggested Next Step & Routing */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
+          <p className="text-sm font-medium text-yellow-800">Suggested Next Step</p>
+          <p className="mt-1 text-sm text-yellow-900">{dynamicNextStep}</p>
+        </div>
+        <div className="bg-indigo-50 p-4 rounded-md border border-indigo-200">
+          <p className="text-sm font-medium text-indigo-800">Suggested Routing</p>
+          <p className="mt-1 text-sm text-indigo-900">{dynamicRouting}</p>
+        </div>
+      </div>
 
       {(caseRecord.workflowStatus === 'NEEDS_INFO' || caseRecord.messages.length > 0) && (
         <div className="bg-white shadow sm:rounded-lg border border-orange-200 overflow-hidden">
@@ -188,7 +257,6 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
               </div>
             )}
 
-            {caseRecord.workflowStatus === 'NEEDS_INFO' && (
               <div className="space-y-4">
                 <div>
                   <label
@@ -239,7 +307,6 @@ export default function CaseInteractions({ caseRecord }: { caseRecord: any }) {
                   {isSubmitting ? 'Submitting...' : 'Submit Information'}
                 </button>
               </div>
-            )}
           </div>
         </div>
       )}

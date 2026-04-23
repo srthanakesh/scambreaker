@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { UserCircle, Shield, KeyRound, Bell } from 'lucide-react';
+import Link from 'next/link';
+import { UserCircle, Shield, KeyRound, Bell, ArrowLeft } from 'lucide-react';
 import ProfileTabs from './ProfileTabs';
 import { prisma } from '@/lib/prisma';
 
@@ -17,6 +18,15 @@ export default async function VictimProfile() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 animate-page-enter">
+      <div className="mb-4">
+        <Link
+          href="/victim/dashboard"
+          className="inline-flex items-center text-slate-600 hover:text-slate-900 text-sm font-medium"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back to Dashboard
+        </Link>
+      </div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Account Settings</h1>
         <p className="text-slate-500 mt-1">Manage your personal profile and security preferences.</p>

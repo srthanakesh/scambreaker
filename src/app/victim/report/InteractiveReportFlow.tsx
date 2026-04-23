@@ -13,8 +13,10 @@ import {
   Mail, 
   MoreHorizontal,
   ArrowRight,
+  ArrowLeft,
 } from 'lucide-react';
 import ReadyStateCard from './ReadyStateCard';
+import EvidenceUploader from '@/components/EvidenceUploader';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const incidentTypes = [
@@ -50,6 +52,7 @@ type ChatMessage = {
   actionSteps?: any[];
   riskLevel?: string;
   analysisJson?: any;
+  fullReply?: string;
 };
 
 // Part 4: Formatted message component
@@ -65,7 +68,7 @@ function FormattedMessage({ text }: { text: string }) {
       const ListTag = listType === 'ol' ? 'ol' : 'ul';
       const listClass = listType === 'ol' ? 'list-decimal' : 'list-disc';
       elements.push(
-        <ListTag key={elements.length} className={`${listClass} ml-6 space-y-1 mb-3`}>
+        <ListTag key={`list-${elements.length}`} className={`${listClass} ml-6 space-y-1 mb-3`}>
           {listItems}
         </ListTag>
       );
@@ -91,7 +94,7 @@ function FormattedMessage({ text }: { text: string }) {
     const parts = content.split(/(\*\*.*?\*\*)/g);
     const formattedContent = parts.map((part, j) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={j} className="font-bold text-slate-900">{part.slice(2, -2)}</strong>;
+        return <strong key={`strong-${i}-${j}`} className="font-bold text-slate-900">{part.slice(2, -2)}</strong>;
       }
       return part;
     });
@@ -99,15 +102,15 @@ function FormattedMessage({ text }: { text: string }) {
     if (olMatch) {
       if (listType && listType !== 'ol') flushList();
       listType = 'ol';
-      listItems.push(<li key={i}>{formattedContent}</li>);
+      listItems.push(<li key={`li-${i}`}>{formattedContent}</li>);
     } else if (ulMatch) {
       if (listType && listType !== 'ul') flushList();
       listType = 'ul';
-      listItems.push(<li key={i}>{formattedContent}</li>);
+      listItems.push(<li key={`li-${i}`}>{formattedContent}</li>);
     } else {
       flushList();
       if (trimmed !== '') {
-        elements.push(<p key={i} className="mb-3 last:mb-0">{formattedContent}</p>);
+        elements.push(<p key={`p-${i}`} className="mb-3 last:mb-0">{formattedContent}</p>);
       }
     }
   });
@@ -122,10 +125,12 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [language, setLanguage] = useState<'en' | 'ms' | 'zh' | 'ta'>('en');
+  const [ocrContext, setOcrContext] = useState<string>('');
 
   const [conversationHistory, setConversationHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [isConversationReady, setIsConversationReady] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<any | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{name: string, dataUrl: string}>>([]);
 
   const t = useMemo(() => ({
     en: {
@@ -163,14 +168,17 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
   }[language]), [language, user.fullName]);
 
   const handleSend = async () => {
-    if (!input.trim() || isProcessing || isConversationReady) return;
+    if ((!input.trim() && !ocrContext) || isProcessing || isConversationReady) return;
 
-    const userMsg = input.trim();
-    const newHistory = [...conversationHistory, { role: 'user' as const, content: userMsg }];
+    const userMsg = input.trim() || 'Uploaded an evidence file.';
+    const payloadContent = ocrContext ? `${userMsg}\n\n${ocrContext}` : userMsg;
+    
+    const newHistory = [...conversationHistory, { role: 'user' as const, content: payloadContent }];
     
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setConversationHistory(newHistory);
     setInput('');
+    setOcrContext('');
     setIsProcessing(true);
 
     try {
@@ -179,7 +187,7 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages: newHistory }),
+        body: JSON.stringify({ messages: newHistory, language }),
       });
 
       if (!res.ok) {
@@ -200,7 +208,8 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
             content: null,
             analysisJson: data.analysisJson,
             actionSteps: data.actionSteps,
-            riskLevel: data.riskLevel
+            riskLevel: data.riskLevel,
+            fullReply: data.reply
           }
         ]);
       } else {
@@ -234,7 +243,8 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
         },
         body: JSON.stringify({ 
           rawDescription,
-          analysisJson: pendingAnalysis
+          analysisJson: pendingAnalysis,
+          uploadedFiles
         }),
       });
 
@@ -262,71 +272,26 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-[#f8fafc] text-slate-900 font-sans overflow-hidden">
-      <div className="w-[280px] bg-white border-r border-slate-200 flex flex-col h-full flex-shrink-0">
-        <div className="h-[72px] flex items-center px-6 border-b border-transparent cursor-pointer">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#f8fafc] text-slate-900 font-sans overflow-hidden">
+      <div className="h-[72px] flex justify-between items-center px-8 border-b border-slate-200 bg-white flex-shrink-0 z-10">
+        <div className="flex items-center">
           <Link href="/">
             <span className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-slate-800 to-slate-500">
               ScamBreaker
             </span>
           </Link>
         </div>
-
-        <div className="px-6 pt-8 pb-4">
-          <h2 className="text-[1.35rem] font-medium text-slate-900 leading-tight">
-            Report Incident
-          </h2>
-          <p className="text-[13px] text-slate-500 mt-1">Process tracking</p>
-        </div>
-
-        <div className="flex-grow py-4">
-          <div className="relative">
-            <div className="relative z-10 flex items-center px-6 py-3 bg-[#e0e7ff] mr-4 rounded-r-full cursor-pointer">
-              <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium border-2 border-transparent">
-                1
-              </div>
-              <span className="ml-3 text-sm font-semibold text-blue-800">
-                Incident Type
-              </span>
-            </div>
-
-            <div className="absolute left-[35px] top-6 bottom-[-200px] w-px bg-slate-200 z-0"></div>
-
-            {[
-              { num: 2, label: 'Next Steps' },
-              { num: 3, label: 'Review' },
-            ].map((step) => (
-              <div
-                key={step.num}
-                className="relative z-10 flex items-center px-6 py-4 cursor-not-allowed opacity-70"
-              >
-                <div className="w-6 h-6 rounded-full bg-white text-slate-500 flex items-center justify-center text-xs font-medium border-2 border-slate-300">
-                  {step.num}
-                </div>
-                <span className="ml-3 text-sm font-medium text-slate-600">
-                  {step.label}
-                </span>
-              </div>
-            ))}
-          </div>
+        <div className="flex items-center space-x-6">
+          <Link
+            href="/victim/dashboard"
+            className="flex items-center text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            Cancel Report <X className="w-4 h-4 ml-2" />
+          </Link>
         </div>
       </div>
 
-      <div className="flex-grow flex flex-col h-full bg-[#f8fafc] overflow-y-auto">
-        <div className="h-[72px] flex justify-end items-center px-8 border-b border-slate-200 bg-white sticky top-0 z-10">
-          <div className="flex items-center space-x-6">
-            <button className="text-slate-400 hover:text-slate-600 transition-colors">
-              <HelpCircle className="w-5 h-5 fill-slate-500 text-white" />
-            </button>
-            <Link
-              href="/victim/dashboard"
-              className="flex items-center text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
-            >
-              Cancel Report <X className="w-4 h-4 ml-2" />
-            </Link>
-          </div>
-        </div>
-
+      <div className="flex-grow flex flex-col overflow-y-auto">
         {/* Content Body: Chat Interface */}
         <div className="flex-grow flex flex-col relative max-w-4xl w-full mx-auto w-[100%]">
           
@@ -357,7 +322,7 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
 
             {messages.map((msg, idx) => (
               <div
-                key={idx}
+                key={`msg-${idx}`}
                 className={`flex items-start ${
                   msg.role === 'user' ? 'justify-end self-end text-right' : ''
                 }`}
@@ -371,7 +336,7 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                 {msg.role === 'ready_card' ? (
                   <ReadyStateCard 
                     analysisJson={msg.analysisJson}
-                    actionSteps={msg.actionSteps || null}
+                    fullReply={msg.fullReply || ''}
                     riskLevel={msg.riskLevel as any}
                     onSubmitReport={handleSubmitReport}
                     onKeepChatting={handleKeepChatting}
@@ -438,13 +403,18 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                   exit={{ opacity: 0, y: 20 }}
                   className="relative flex items-center bg-white border rounded-full shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all overflow-hidden p-2 border-slate-300"
                 >
+                  <EvidenceUploader 
+                    onExtractionComplete={(text) => setOcrContext(text)} 
+                    onFileUploaded={(name, dataUrl) => setUploadedFiles(prev => [...prev, { name, dataUrl }])}
+                    language={language}
+                  />
                   <input 
                     type="text" 
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     disabled={isProcessing}
                     placeholder="Type here..." 
-                    className="w-full bg-transparent px-5 py-3 text-[1.05rem] outline-none text-slate-800 placeholder-slate-400 disabled:bg-transparent"
+                    className="w-full bg-transparent px-3 py-3 text-[1.05rem] outline-none text-slate-800 placeholder-slate-400 disabled:bg-transparent"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -453,10 +423,10 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                     }}
                   />
                   <button 
-                    disabled={!input.trim() || isProcessing}
+                    disabled={(!input.trim() && !ocrContext) || isProcessing}
                     onClick={handleSend}
                     className={`ml-2 w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-full transition-all ${
-                      input.trim() && !isProcessing
+                      (input.trim() || ocrContext) && !isProcessing
                         ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' 
                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                     }`}

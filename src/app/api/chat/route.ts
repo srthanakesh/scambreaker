@@ -9,13 +9,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { messages } = await request.json();
+    const { messages, language } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 });
     }
 
-    const responseText = await chatWithGLM(messages);
+    const languageMap: Record<string, string> = {
+      'en': 'English',
+      'ms': 'Bahasa Melayu',
+      'zh': 'Chinese (Mandarin)',
+      'ta': 'Tamil'
+    };
+    const targetLanguage = languageMap[language as string] || 'English';
+
+    const now = new Date();
+    const currentDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const chatMessages = [
+      { role: 'system', content: `CRITICAL STRICT RULE: You MUST reply entirely in ${targetLanguage}. Do not use any other language to communicate with the user. When asking for missing information, YOU MUST ALWAYS use a concise, bulleted list format. NEVER ask for information using conversational paragraphs. Preserve the STAGE 3 logical flow exactly, but output in ${targetLanguage}. CURRENT DATE: ${currentDate}. CURRENT TIME: ${currentTime}. When the user says "today", use ${currentDate}. When they say "yesterday", calculate the previous day.` },
+      ...messages
+    ];
+
+    const responseText = await chatWithGLM(chatMessages);
 
     // Extract JSON block if present
     const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || responseText.match(/\{[\s\S]*"scamType"[\s\S]*\}/);
@@ -43,42 +60,8 @@ export async function POST(request: Request) {
             'LOW': 'RECOVERY'
           };
           riskLevel = urgencyMap[analysisJson.urgency] || 'RECOVERY';
-
-          // Extract action steps
-          try {
-            const stepsSection = reply.split(/#### 3\. ACTION STEPS/i)[1]?.split(/#### 4\./)[0] || '';
-            const stepLines = stepsSection.split('\n').filter(line => line.trim() !== '');
-            
-            const parsedSteps = [];
-            let currentStep: any = null;
-
-            for (const line of stepLines) {
-              const match = line.match(/^(\d+)\.\s+(.*)/);
-              if (match) {
-                if (currentStep) parsedSteps.push(currentStep);
-                const stepNum = parseInt(match[1]);
-                currentStep = {
-                  id: `step-${stepNum}`,
-                  title: match[2].trim(),
-                  description: '',
-                  priority: stepNum === 1 ? 'IMMEDIATE' : stepNum === 2 ? 'URGENT' : 'STANDARD',
-                  phoneNumber: null
-                };
-              } else if (currentStep) {
-                const phoneMatch = line.match(/(\d{1,4}-\d{3,4}-\d{4,5}|\d{3})/); // Matches 997 or 1300-880-900
-                if (phoneMatch) {
-                  currentStep.phoneNumber = phoneMatch[0];
-                } else {
-                  currentStep.description += (currentStep.description ? ' ' : '') + line.trim();
-                }
-              }
-            }
-            if (currentStep) parsedSteps.push(currentStep);
-            actionSteps = parsedSteps.length > 0 ? parsedSteps : null;
-          } catch (e) {
-            console.error("Failed to parse action steps:", e);
-            actionSteps = null;
-          }
+          
+          actionSteps = null; // Removed obsolete text extraction logic
         }
       } catch (e) {
         console.error("Failed to parse GLM JSON block:", e);
