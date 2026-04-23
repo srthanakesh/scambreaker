@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -14,6 +14,8 @@ import {
   MoreHorizontal,
   ArrowRight,
 } from 'lucide-react';
+import ReadyStateCard from './ReadyStateCard';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const incidentTypes = [
   {
@@ -43,47 +45,186 @@ const incidentTypes = [
 ];
 
 type ChatMessage = {
-  role: 'user' | 'assistant';
-  content: string;
+  role: 'user' | 'assistant' | 'system_reasoning' | 'ready_card';
+  content: string | React.ReactNode;
+  actionSteps?: any[];
+  riskLevel?: string;
+  analysisJson?: any;
 };
+
+// Part 4: Formatted message component
+function FormattedMessage({ text }: { text: string }) {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+
+  let listItems: React.ReactNode[] = [];
+  let listType: 'ol' | 'ul' | null = null;
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      const ListTag = listType === 'ol' ? 'ol' : 'ul';
+      const listClass = listType === 'ol' ? 'list-decimal' : 'list-disc';
+      elements.push(
+        <ListTag key={elements.length} className={`${listClass} ml-6 space-y-1 mb-3`}>
+          {listItems}
+        </ListTag>
+      );
+      listItems = [];
+      listType = null;
+    }
+  };
+
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (trimmed === '' && !listType) {
+      flushList();
+      return;
+    }
+
+    // Check for lists
+    const olMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+    const ulMatch = trimmed.match(/^- \s*(.*)/);
+
+    const content = olMatch ? olMatch[2] : (ulMatch ? ulMatch[1] : trimmed);
+    
+    // Check for bold text in the content
+    const parts = content.split(/(\*\*.*?\*\*)/g);
+    const formattedContent = parts.map((part, j) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={j} className="font-bold text-slate-900">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+
+    if (olMatch) {
+      if (listType && listType !== 'ol') flushList();
+      listType = 'ol';
+      listItems.push(<li key={i}>{formattedContent}</li>);
+    } else if (ulMatch) {
+      if (listType && listType !== 'ul') flushList();
+      listType = 'ul';
+      listItems.push(<li key={i}>{formattedContent}</li>);
+    } else {
+      flushList();
+      if (trimmed !== '') {
+        elements.push(<p key={i} className="mb-3 last:mb-0">{formattedContent}</p>);
+      }
+    }
+  });
+
+  flushList();
+  return <div className="formatted-message">{elements}</div>;
+}
 
 export default function InteractiveReportFlow({ user }: { user: any }) {
   const router = useRouter();
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Array<{role: string, content: React.ReactNode}>>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [language, setLanguage] = useState<'en' | 'ms' | 'zh' | 'ta'>('en');
 
-  const t = {
+  const [conversationHistory, setConversationHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
+  const [isConversationReady, setIsConversationReady] = useState(false);
+  const [pendingAnalysis, setPendingAnalysis] = useState<any | null>(null);
+
+  const t = useMemo(() => ({
     en: {
       hello: `Hello, ${user.fullName.split(' ')[0]}. I am the ScamBreaker incident intake assistant.`,
       instruction: `Please tell me what happened. Include any details like names, numbers, or websites. This helps me send your report to the right team.`,
       error: `An error occurred while submitting your report. Please try again.`,
+      readyMessage: `I have enough information to create your report. Click the button below to submit.`,
+      submitBtn: `Submit Report`,
+      keepChattingReply: `Sure! Tell me anything else and I can update the report.`
     },
     ms: {
       hello: `Helo, ${user.fullName.split(' ')[0]}. Saya ialah pembantu penerimaan insiden ScamBreaker.`,
       instruction: `Sila beritahu saya apa yang berlaku. Sertakan butiran seperti nama, nombor, atau laman web. Ini membantu saya menghantar laporan anda ke pasukan yang betul.`,
       error: `Ralat berlaku semasa menghantar laporan anda. Sila cuba lagi.`,
+      readyMessage: `Saya mempunyai maklumat yang mencukupi untuk membuat laporan anda. Klik butang di bawah untuk menghantar.`,
+      submitBtn: `Hantar Laporan`,
+      keepChattingReply: `Tentu! Beritahu saya apa-apa lagi dan saya boleh mengemas kini laporan itu.`
     },
     zh: {
       hello: `你好，${user.fullName.split(' ')[0]}。我是 ScamBreaker 事件记录助手。`,
       instruction: `请告诉我发生了什么事情。请包含姓名、电话号码或网站等详细信息。这将帮助我将您的报告发送给正确的团队。`,
       error: `提交报告时出错。请重试。`,
+      readyMessage: `我有足够的信息来创建您的报告。点击下面的按钮提交。`,
+      submitBtn: `提交报告`,
+      keepChattingReply: `当然可以！告诉我更多信息，我会更新报告。`
     },
     ta: {
       hello: `வணக்கம், ${user.fullName.split(' ')[0]}. நான் ScamBreaker சம்பவ பதிவு உதவியாளர்.`,
       instruction: `என்ன நடந்தது என்று சொல்லுங்கள். பெயர்கள், எண்கள் அல்லது இணையதளங்கள் போன்ற விவரங்களைச் சேர்க்கவும். உங்கள் அறிக்கையை சரியான குழுவிற்கு அனுப்ப இது உதவும்.`,
       error: `உங்கள் அறிக்கையை சமர்ப்பிக்கும் போது பிழை ஏற்பட்டது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.`,
+      readyMessage: `உங்கள் அறிக்கையை உருவாக்க என்னிடம் போதுமான தகவல் உள்ளது. சமர்ப்பிக்க கீழே உள்ள பொத்தானைக் கிளிக் செய்யவும்.`,
+      submitBtn: `அறிக்கையை சமர்ப்பிக்கவும்`,
+      keepChattingReply: `நிச்சயமாக! வேறு எதையும் சொல்லுங்கள், நான் அறிக்கையைப் புதுப்பிக்க முடியும்.`
     }
-  }[language];
+  }[language]), [language, user.fullName]);
 
   const handleSend = async () => {
-    if (!input.trim() || isProcessing) return;
+    if (!input.trim() || isProcessing || isConversationReady) return;
 
     const userMsg = input.trim();
+    const newHistory = [...conversationHistory, { role: 'user' as const, content: userMsg }];
+    
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setConversationHistory(newHistory);
     setInput('');
     setIsProcessing(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: newHistory }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Chat API failed');
+      }
+
+      const data = await res.json();
+      
+      setConversationHistory(prev => [...prev, { role: 'assistant' as const, content: data.reply }]);
+
+      if (data.isReady) {
+        setPendingAnalysis(data.analysisJson);
+        setIsConversationReady(true);
+        setMessages(prev => [
+          ...prev,
+          { 
+            role: 'ready_card', 
+            content: null,
+            analysisJson: data.analysisJson,
+            actionSteps: data.actionSteps,
+            riskLevel: data.riskLevel
+          }
+        ]);
+      } else {
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: data.reply }
+        ]);
+      }
+    } catch (error) {
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: t.error }
+      ]);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSubmitReport = async () => {
+    setIsProcessing(true);
+    const rawDescription = conversationHistory
+      .filter(m => m.role === 'user')
+      .map(m => m.content)
+      .join('\n\n');
 
     try {
       const res = await fetch('/api/cases', {
@@ -91,22 +232,14 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ rawDescription: userMsg }),
+        body: JSON.stringify({ 
+          rawDescription,
+          analysisJson: pendingAnalysis
+        }),
       });
 
       if (!res.ok) {
-        let errorMsg = t.error;
-        try {
-          const data = await res.json();
-          if (data?.error) errorMsg = data.error;
-        } catch (e) {}
-        
-        setMessages(prev => [
-          ...prev,
-          { role: 'assistant', content: errorMsg }
-        ]);
-        setIsProcessing(false);
-        return;
+        throw new Error('Case creation failed');
       }
 
       const data = await res.json();
@@ -118,6 +251,14 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
       ]);
       setIsProcessing(false);
     }
+  };
+
+  const handleKeepChatting = () => {
+    setIsConversationReady(false);
+    setMessages(prev => [
+      ...prev,
+      { role: 'assistant', content: t.keepChattingReply }
+    ]);
   };
 
   return (
@@ -190,7 +331,7 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
         <div className="flex-grow flex flex-col relative max-w-4xl w-full mx-auto w-[100%]">
           
           {/* Chat Messages Area */}
-          <div className="flex-grow overflow-y-auto px-8 py-8 space-y-8 flex flex-col">
+          <div className="flex-grow overflow-y-auto px-8 py-8 space-y-8 flex flex-col pb-32">
             
             {/* Assistant Welcome Message */}
             <div className="flex items-start max-w-[85%]">
@@ -227,37 +368,50 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
                   </div>
                 )}
 
-                {msg.role === 'system_reasoning' && (
-                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-1 border border-purple-200">
-                    <MoreHorizontal className="w-5 h-5 text-purple-600" />
-                  </div>
-                )}
-                
-                <div className={`mx-4 px-6 py-4 shadow-sm max-w-[85%] ${
-                  msg.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm text-left' 
-                    : msg.role === 'system_reasoning'
-                    ? ''
-                    : 'bg-white border border-slate-200 rounded-2xl rounded-tl-sm text-slate-800'
-                }`}>
-                  {typeof msg.content === 'string' ? (
-                    <p className={`text-[1.05rem] leading-relaxed ${msg.role === 'assistant' ? 'font-medium' : ''}`}>
-                      {msg.content}
-                    </p>
-                  ) : (
-                    msg.content
-                  )}
-                </div>
+                {msg.role === 'ready_card' ? (
+                  <ReadyStateCard 
+                    analysisJson={msg.analysisJson}
+                    actionSteps={msg.actionSteps || null}
+                    riskLevel={msg.riskLevel as any}
+                    onSubmitReport={handleSubmitReport}
+                    onKeepChatting={handleKeepChatting}
+                    isSubmitting={isProcessing}
+                  />
+                ) : (
+                  <>
+                    {msg.role === 'system_reasoning' && (
+                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-1 border border-purple-200">
+                        <MoreHorizontal className="w-5 h-5 text-purple-600" />
+                      </div>
+                    )}
+                    
+                    <div className={`mx-4 px-6 py-4 shadow-sm max-w-[85%] ${
+                      msg.role === 'user' 
+                        ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm text-left' 
+                        : msg.role === 'system_reasoning'
+                        ? ''
+                        : 'bg-white border border-slate-200 rounded-2xl rounded-tl-sm text-slate-800'
+                    }`}>
+                      {typeof msg.content === 'string' ? (
+                        <div className={`text-[1.05rem] leading-relaxed ${msg.role === 'assistant' ? 'font-medium' : ''}`}>
+                          <FormattedMessage text={msg.content} />
+                        </div>
+                      ) : (
+                        msg.content
+                      )}
+                    </div>
 
-                {msg.role === 'user' && (
-                  <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 mt-1 overflow-hidden">
-                    <span className="text-sm font-bold text-slate-500">{(user.fullName[0] || 'U').toUpperCase()}</span>
-                  </div>
+                    {msg.role === 'user' && (
+                      <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 mt-1 overflow-hidden">
+                        <span className="text-sm font-bold text-slate-500">{(user.fullName[0] || 'U').toUpperCase()}</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))}
 
-            {isProcessing && (
+            {isProcessing && !isConversationReady && (
               <div className="flex items-start max-w-[85%]">
                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-1 border border-blue-200">
                   <Shield className="w-5 h-5 text-blue-600" />
@@ -276,33 +430,43 @@ export default function InteractiveReportFlow({ user }: { user: any }) {
 
           {/* Chat Input Area */}
           <div className="p-6 bg-[#f8fafc] bg-opacity-95 backdrop-blur sticky bottom-0">
-            <div className={`relative flex items-center bg-white border rounded-full shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all overflow-hidden p-2 ${isProcessing ? 'border-slate-200 opacity-70' : 'border-slate-300'}`}>
-              <input 
-                type="text" 
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={isProcessing}
-                placeholder="Type here..." 
-                className="w-full bg-transparent px-5 py-3 text-[1.05rem] outline-none text-slate-800 placeholder-slate-400 disabled:bg-transparent"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
-              <button 
-                disabled={!input.trim() || isProcessing}
-                onClick={handleSend}
-                className={`ml-2 w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-full transition-all ${
-                  input.trim() && !isProcessing
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' 
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
+            <AnimatePresence>
+              {!isConversationReady && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="relative flex items-center bg-white border rounded-full shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all overflow-hidden p-2 border-slate-300"
+                >
+                  <input 
+                    type="text" 
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    disabled={isProcessing}
+                    placeholder="Type here..." 
+                    className="w-full bg-transparent px-5 py-3 text-[1.05rem] outline-none text-slate-800 placeholder-slate-400 disabled:bg-transparent"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                  />
+                  <button 
+                    disabled={!input.trim() || isProcessing}
+                    onClick={handleSend}
+                    className={`ml-2 w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-full transition-all ${
+                      input.trim() && !isProcessing
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' 
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
             <div className="mt-3 text-center">
               <p className="text-xs text-slate-400 font-medium tracking-wide">
                 ScamBreaker Assistant uses AI to interpret and route your initial case parameters.

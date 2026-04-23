@@ -20,14 +20,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { rawDescription } = await request.json();
+    const { rawDescription, analysisJson } = await request.json();
 
     if (!rawDescription) {
       return NextResponse.json({ error: 'Description is required' }, { status: 400 });
     }
 
-    // 1. Run Real GLM analysis
-    const analysis = await analyzeCase(rawDescription);
+    // 1. Run GLM analysis if not provided
+    const analysis = analysisJson || await analyzeCase(rawDescription);
 
     // 2. Create the case with analysis payload
     const newCase = await prisma.case.create({

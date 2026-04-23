@@ -123,7 +123,72 @@ async function glmAnalyzeCase(description: string): Promise<GLMAnalysis> {
   return normalizeAnalysis(analysis);
 }
 
-function normalizeAnalysis(raw: any): GLMAnalysis {
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export async function chatWithGLM(messages: ChatMessage[]): Promise<string> {
+  const apiKey = process.env.GLM_API_KEY;
+  if (!apiKey) {
+    throw new Error("GLM_API_KEY is not configured in environment variables.");
+  }
+
+  const model = process.env.GLM_MODEL || "glm-4-flash";
+  
+  const payload = JSON.stringify({
+    model: model,
+    messages: [
+      {
+        role: "system",
+        content: ZAI_SYSTEM_PROMPT
+      },
+      ...messages
+    ],
+    temperature: 0.7, // Slightly higher for conversation
+  });
+
+  const maxAttempts = 3;
+  let response: Response | null = null;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: payload,
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        break;
+      }
+      lastError = new Error(`GLM API returned status ${response.status}`);
+    } catch (err) {
+      lastError = err as Error;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (attempt < maxAttempts) {
+      await sleep(300 * Math.pow(2, attempt - 1));
+    }
+  }
+
+  if (!response || !response.ok) {
+    throw lastError || new Error("GLM API request failed.");
+  }
+
+  const result = await response.json();
+  return result.choices?.[0]?.message?.content || "";
+}
+
+export function normalizeAnalysis(raw: any): GLMAnalysis {
   let fallbackUsed = false;
 
   const safeNumber = (val: any, defaultVal: number) => {
