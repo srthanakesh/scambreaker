@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateActionPlan } from '@/lib/action-plan-generator';
 import { 
   AlertCircle, 
   CheckCircle2, 
@@ -75,40 +76,41 @@ export default function ReadyStateCard({
     urgencyTheme = { bg: 'bg-orange-500', title: '⚠️ URGENT — Act within 24 hours' };
   }
 
-  const steps = [
-    {
-      id: 'step-1',
-      title: "Call Your Bank's Fraud Hotline",
-      priority: 'IMMEDIATE',
-      description: isNsrcOnly 
-        ? "We couldn't identify your bank. Please call NSRC immediately at 997." 
-        : "Based on your bank, call their fraud hotline immediately to freeze your account.",
-      button: { icon: <Phone className="w-4 h-4" />, text: "Call Now", link: `tel:${bankNumber.replace(/-/g, '')}` },
-      priorityClass: "bg-red-100 text-red-700 border-red-200"
-    },
-    {
-      id: 'step-2',
-      title: "Call NSRC — National Scam Response Centre",
-      priority: 'IMMEDIATE',
-      description: "Report to the national hotline. They can coordinate with multiple banks simultaneously.",
-      button: { icon: <Phone className="w-4 h-4" />, text: "Call 997", link: "tel:997" },
-      priorityClass: "bg-red-100 text-red-700 border-red-200"
-    },
-    {
-      id: 'step-3',
-      title: "Preserve All Evidence",
-      priority: 'URGENT',
-      description: "Screenshot every message, transaction receipt, and the scammer's profile before they disappear.",
-      priorityClass: "bg-orange-100 text-orange-700 border-orange-200"
-    },
-    {
-      id: 'step-4',
-      title: "File Police Report Within 24 Hours",
-      priority: 'STANDARD',
-      description: "Bring your IC, bank statements, and screenshots to the nearest police station.",
-      priorityClass: "bg-slate-100 text-slate-600 border-slate-200"
-    }
-  ];
+const steps = useMemo(() => {
+  const description = `${analysisJson?.summary || ''} ${fullReply || ''}`;
+
+  return generateActionPlan(description).map((step, index) => ({
+    id: `step-${index}`,
+    title: step.title,
+    priority:
+      step.priority === 'HIGH'
+        ? 'IMMEDIATE'
+        : step.priority === 'MEDIUM'
+          ? 'URGENT'
+          : 'STANDARD',
+    description: step.description,
+    priorityClass:
+      step.priority === 'HIGH'
+        ? "bg-red-100 text-red-700 border-red-200"
+        : step.priority === 'MEDIUM'
+          ? "bg-orange-100 text-orange-700 border-orange-200"
+          : "bg-slate-100 text-slate-600 border-slate-200",
+    button:
+      step.title.toLowerCase().includes('bank')
+        ? {
+            icon: <Phone className="w-4 h-4" />,
+            text: "Call Now",
+            link: `tel:${bankNumber.replace(/-/g, '')}`
+          }
+        : step.title.toLowerCase().includes('nsrc')
+        ? {
+            icon: <Phone className="w-4 h-4" />,
+            text: "Call 997",
+            link: "tel:997"
+          }
+        : null
+  }));
+}, [analysisJson, fullReply, bankNumber]);
 
   return (
     <motion.div 
