@@ -104,13 +104,3 @@ scambreaker/
 
 ---
 
-## 🔐 Default Accounts (after seeding)
-
-- **Authority:** `admin@scambreaker.gov` / `admin123`
-- **Victim:** `victim@example.com` / `victim123`
-
----
-
-## 📜 License
-
-This project is developed for educational and demonstration purposes.
