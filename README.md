@@ -6,6 +6,11 @@
 
 ---
 
+> 🎥 **Pitching Video:**  
+> 👉 https://drive.google.com/file/d/1C_ce5rh4cv3QGwlqcInBg1FMudoECkE1/view?usp=sharing
+
+---
+
 ## ✨ Features
 
 ### Victim Portal (`/victim`)
@@ -101,16 +106,5 @@ scambreaker/
 │   └── lib/             # Shared utilities (auth, prisma, AI engine)
 └── public/              # Static assets
 ```
-
----
----
-
-## 🔗 Additional Resources
-
-- 📄 **PRD (Product Requirements Document):** [View PRD](https://drive.google.com/file/d/1n4f2T2d68gfvYtCtUQPSHYgOq0TkYpdO/view?usp=sharing)
-- 🧠 **SAD (System Analysis Documentation):** [View SAD](https://drive.google.com/file/d/1wCBxBZ2GCpMFGu0z69EuCnY85a1V1SWf/view?usp=sharing)
-- 📊 **QATD (Quality Assurance Testing Documentation):** [View QATD](https://drive.google.com/file/d/1LdG8EJEzpDXlBsTrSI82ctKNXV0P6IdQ/view?usp=sharing)
-- 🎤 **Pitching Deck:** [View Deck](https://drive.google.com/file/d/1ZebA5tHYiH53uTeVAfSxhsqj_2dbz5CE/view?usp=sharing)
-- 🎥 **Pitching Video:** [Watch Video](https://drive.google.com/file/d/1C_ce5rh4cv3QGwlqcInBg1FMudoECkE1/view?usp=sharing)
 
 ---
