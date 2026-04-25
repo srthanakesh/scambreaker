@@ -1,38 +1,116 @@
-SCAMBREAKER
+# 🛡️ ScamBreaker
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+**ScamBreaker** is an AI-powered scam reporting and case management platform built for Malaysia's National Scam Response Centre (NSRC). It connects scam victims directly with law enforcement authorities through an intelligent, guided reporting workflow.
 
-## Getting Started
+> 🔗 **Live Demo:** [https://scambreaker.vercel.app](https://scambreaker.vercel.app)
 
-First, run the development server:
+---
 
+## ✨ Features
+
+### Victim Portal (`/victim`)
+- **AI-Guided Reporting** — Conversational AI that walks victims through filing a scam report
+- **Smart Case Analysis** — Auto scam type detection, urgency scoring, and risk assessment via GLM AI
+- **Document Generation** — Auto-generates Police Reports (BM) and Bank Dispute Letters (EN)
+- **Case Dashboard** — Track status, upload evidence, view AI-recommended action steps
+- **Profile Management** — Manage IC Number, Phone Number linked to reports
+
+### Authority Portal (`/authority`)
+- **Case Management Dashboard** — Priority-sorted cases with SLA enforcement
+- **AI Insights Panel** — Recoverability scoring with time-decay modeling
+- **Workflow Engine** — `NEW → TRIAGED → INVESTIGATING → RESOLVED / CLOSED`
+- **Intervention Actions** — Freeze accounts, escalate cases, request evidence
+- **Audit Trail** — Full workflow logging with actor tracking
+
+### AI & Backend
+- **GLM Integration** — Structured extraction of scam type, amount, suspects, bank accounts
+- **Recoverability Engine** — Dynamic score decay based on elapsed time
+- **Role-Based Auth** — JWT authentication with victim and authority roles
+- **Evidence Management** — File upload linked to case records
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework:** Next.js 16 (App Router, Turbopack)
+- **Language:** TypeScript
+- **Database:** PostgreSQL (Neon) + Prisma ORM
+- **AI Model:** GLM (ZhipuAI)
+- **Auth:** JWT via `jose` + `bcryptjs`
+- **Styling:** Tailwind CSS 4
+- **Animation:** Framer Motion
+- **OCR:** Tesseract.js
+- **PDF Parsing:** pdfjs-dist
+- **Deployment:** Vercel
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- PostgreSQL database (local or [Neon](https://neon.tech))
+
+### 1. Clone the repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/your-username/scambreaker.git
+cd scambreaker
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Configure environment variables
+Create a `.env` file in the root directory:
+```env
+DATABASE_URL="postgresql://user:password@host:5432/dbname?sslmode=require"
+GLM_API_KEY="your-glm-api-key"
+GLM_MODEL="glm-5.1"
+JWT_SECRET="your-jwt-secret"
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Set up the database
+```bash
+npx prisma db push
+npx prisma db seed
+```
 
-## Learn More
+### 5. Run the development server
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📁 Project Structure
 
-## Deploy on Vercel
+```
+scambreaker/
+├── prisma/              # Database schema & seed data
+├── src/
+│   ├── app/
+│   │   ├── api/         # REST API routes (cases, chat, evidence)
+│   │   ├── actions/     # Server actions (workflow, case management)
+│   │   ├── authority/   # Authority dashboard pages
+│   │   ├── victim/      # Victim portal pages
+│   │   └── page.tsx     # Landing page
+│   └── lib/             # Shared utilities (auth, prisma, AI engine)
+└── public/              # Static assets
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🔐 Default Accounts (after seeding)
+
+- **Authority:** `admin@scambreaker.gov` / `admin123`
+- **Victim:** `victim@example.com` / `victim123`
+
+---
+
+## 📜 License
+
+This project is developed for educational and demonstration purposes.
