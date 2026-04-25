@@ -4,9 +4,10 @@ export const dynamic = 'force-dynamic'; // IMPORTANT: prevents build-time execut
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
     // Import inside handler to prevent build-time execution crashes
     const { prisma } = await import('@/lib/prisma');
     const { getCurrentUser } = await import('@/lib/auth');
