@@ -1,19 +1,23 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/auth';
-import { getDynamicRecoverability } from '@/lib/recoverability-engine';
+
+export const dynamic = 'force-dynamic'; // IMPORTANT: prevents build-time execution
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
+    // Import inside handler to prevent build-time execution crashes
+    const { prisma } = await import('@/lib/prisma');
+    const { getCurrentUser } = await import('@/lib/auth');
+    const { getDynamicRecoverability } = await import('@/lib/recoverability-engine');
+
     const session = await getCurrentUser();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id } = params;
 
     const caseRecord = await prisma.case.findUnique({
       where: { id },
@@ -31,12 +35,17 @@ export async function GET(
     }
 
     // Don't decay resolved/closed cases
-    if (caseRecord.workflowStatus === 'RESOLVED' || caseRecord.workflowStatus === 'CLOSED') {
+    if (
+      caseRecord.workflowStatus === 'RESOLVED' ||
+      caseRecord.workflowStatus === 'CLOSED'
+    ) {
       return NextResponse.json({
         originalScore: caseRecord.recoverabilityScore ?? 0,
         currentScore: caseRecord.recoverabilityScore ?? 0,
         currentLevel: 'LOW',
-        elapsedMinutes: Math.floor((Date.now() - new Date(caseRecord.createdAt).getTime()) / 60000),
+        elapsedMinutes: Math.floor(
+          (Date.now() - new Date(caseRecord.createdAt).getTime()) / 60000
+        ),
         isLocked: true,
       });
     }
@@ -55,6 +64,9 @@ export async function GET(
     });
   } catch (error) {
     console.error('Error fetching recoverability:', error);
-    return NextResponse.json({ error: 'Failed to fetch recoverability' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch recoverability' },
+      { status: 500 }
+    );
   }
 }
