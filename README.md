@@ -1,4 +1,4 @@
-# 🛡️ ScamBreaker
+# ScamBreaker
 
 **ScamBreaker** is an AI-powered scam reporting and case management platform built for Malaysia's National Scam Response Centre (NSRC). It connects scam victims directly with law enforcement authorities through an intelligent, guided reporting workflow.
 
@@ -14,24 +14,27 @@
 ## ✨ Features
 
 ### Victim Portal (`/victim`)
-- **AI-Guided Reporting** — Conversational AI that walks victims through filing a scam report
-- **Smart Case Analysis** — Auto scam type detection, urgency scoring, and risk assessment via GLM AI
-- **Document Generation** — Auto-generates Police Reports (BM) and Bank Dispute Letters (EN)
-- **Case Dashboard** — Track status, upload evidence, view AI-recommended action steps
-- **Profile Management** — Manage IC Number, Phone Number linked to reports
+
+- **AI-Guided Reporting** - Conversational AI that walks victims through filing a scam report
+- **Smart Case Analysis** - Auto scam type detection, urgency scoring, and risk assessment via GLM AI
+- **Document Generation** - Auto-generates Police Reports (BM) and Bank Dispute Letters (EN)
+- **Case Dashboard** - Track status, upload evidence, view AI-recommended action steps
+- **Profile Management** - Manage IC Number, Phone Number linked to reports
 
 ### Authority Portal (`/authority`)
-- **Case Management Dashboard** — Priority-sorted cases with SLA enforcement
-- **AI Insights Panel** — Recoverability scoring with time-decay modeling
-- **Workflow Engine** — `NEW → TRIAGED → INVESTIGATING → RESOLVED / CLOSED`
-- **Intervention Actions** — Freeze accounts, escalate cases, request evidence
-- **Audit Trail** — Full workflow logging with actor tracking
+
+- **Case Management Dashboard** - Priority-sorted cases with SLA enforcement
+- **AI Insights Panel** - Recoverability scoring with time-decay modeling
+- **Workflow Engine** - `NEW -> TRIAGED -> INVESTIGATING -> RESOLVED / CLOSED`
+- **Intervention Actions** - Freeze accounts, escalate cases, request evidence
+- **Audit Trail** - Full workflow logging with actor tracking
 
 ### AI & Backend
-- **GLM Integration** — Structured extraction of scam type, amount, suspects, bank accounts
-- **Recoverability Engine** — Dynamic score decay based on elapsed time
-- **Role-Based Auth** — JWT authentication with victim and authority roles
-- **Evidence Management** — File upload linked to case records
+
+- **GLM Integration** - Structured extraction of scam type, amount, suspects, bank accounts
+- **Recoverability Engine** - Dynamic score decay based on elapsed time
+- **Role-Based Auth** - JWT authentication with victim and authority roles
+- **Evidence Management** - File upload linked to case records
 
 ---
 
@@ -53,23 +56,29 @@
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
 - PostgreSQL database (local or [Neon](https://neon.tech))
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/your-username/scambreaker.git
 cd scambreaker
 ```
 
 ### 2. Install dependencies
+
 ```bash
 npm install
 ```
 
 ### 3. Configure environment variables
-Create a `.env` file in the root directory:
-```env
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
 DATABASE_URL="postgresql://user:password@host:5432/dbname?sslmode=require"
 GLM_API_KEY="your-glm-api-key"
 GLM_MODEL="glm-5.1"
@@ -77,12 +86,14 @@ JWT_SECRET="your-jwt-secret"
 ```
 
 ### 4. Set up the database
+
 ```bash
 npx prisma db push
 npx prisma db seed
 ```
 
 ### 5. Run the development server
+
 ```bash
 npm run dev
 ```
